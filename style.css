@@ -1,0 +1,184 @@
+/* JEE MAIN STYLE CSS */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; background-color: #f0f2f5; overflow: hidden; }
+
+/* Screen Management */
+.screen-full {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: white;
+}
+
+.portal-box, .login-box {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    text-align: center;
+    width: 350px;
+}
+
+.portal-box h2, .login-box h2 { margin-bottom: 20px; color: #1c2b5e; }
+.portal-btns { display: flex; flex-direction: column; gap: 15px; }
+.login-box input { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; }
+.btn-back { display: block; margin: 15px auto 0; background: none; border: none; color: #666; cursor: pointer; text-decoration: underline; }
+
+/* Admin Dashboard */
+.admin-container {
+    width: 80%;
+    max-width: 800px;
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    overflow-y: auto;
+    max-height: 90vh;
+}
+.admin-section { border: 1px solid #eee; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+.admin-section h3 { margin-bottom: 15px; color: #1c2b5e; }
+.responses-container { background: #f9f9f9; padding: 10px; border: 1px solid #ddd; max-height: 300px; overflow-y: auto; margin-bottom: 10px; text-align: left; }
+.response-file-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+
+/* Existing JEE Header */
+.jee-header {
+    width: 100%;
+    padding: 10px 50px;
+    border-bottom: 2px solid #ddd;
+    position: absolute;
+    top: 0;
+}
+
+.logo-section { display: flex; align-items: center; gap: 20px; }
+.nta-text h1 { font-size: 1.5rem; color: #1c2b5e; }
+.nta-text p { font-size: 1rem; color: #28a745; font-weight: bold; }
+
+/* Main Container */
+.jee-container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: white;
+}
+
+/* JEE Top Header */
+.jee-main-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 20px;
+    background: white;
+    border-bottom: 1px solid #ccc;
+}
+
+.nta-brand { display: flex; align-items: center; gap: 15px; }
+.nta-brand h2 { font-size: 1.1rem; margin: 0; color: #1c2b5e; }
+.nta-brand p { font-size: 0.8rem; margin: 0; color: #28a745; font-weight: bold; }
+
+.candidate-info { display: flex; align-items: center; gap: 15px; padding: 5px; border: 1px solid #ddd; }
+.info-details p { font-size: 0.85rem; margin: 2px 0; }
+.info-details .val { font-weight: bold; color: #d9534f; }
+
+/* Subject Bar */
+.subject-bar {
+    display: flex;
+    background: #1c2b5e;
+    color: white;
+    padding: 0 20px;
+}
+.subject-tag { background: #f39c12; padding: 10px 20px; font-weight: bold; }
+.subject { padding: 10px 25px; cursor: pointer; border-right: 1px solid #444; font-size: 0.9rem; }
+.subject.active { background: #007bff; }
+
+/* Layout Grid */
+.main-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Question Area */
+.question-area {
+    flex: 1;
+    padding: 20px;
+    border-right: 1px solid #ccc;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.question-header { border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
+
+.question-content { flex: 1; font-size: 1.1rem; line-height: 1.6; }
+#options-container { margin: 20px 0; display: grid; gap: 10px; }
+.option-item { background: #f9f9f9; border: 1px solid #ddd; padding: 10px; border-radius: 4px; }
+
+/* Answer Recording Box */
+#answer-container { position: relative; margin-top: 20px; padding: 15px; background: #fffdf0; border: 1px solid #f9da6d; }
+#answer-box { width: 100%; height: 100px; padding: 10px; font-size: 1.1rem; border: 1px solid #ccc; resize: none; background: #fff; }
+
+#live-mic-meter { width: 100%; height: 6px; background: #eee; border-radius: 3px; margin: 5px 0; }
+#live-mic-fill { width: 0%; height: 100%; background: #28a745; transition: width 0.1s; }
+
+/* Sidebar */
+.sidebar { width: 300px; background: #f8f9fa; padding: 15px; display: flex; flex-direction: column; }
+.status-summary { background: white; border: 1px solid #ddd; padding: 10px; margin-bottom: 15px; }
+.status-row { display: flex; gap: 10px; margin-bottom: 8px; font-size: 0.75rem; }
+.stat { display: flex; align-items: center; gap: 5px; flex: 1; }
+.box { width: 25px; height: 25px; display: inline-block; text-align: center; line-height: 25px; border-radius: 3px; color: white; font-weight: bold; }
+
+.v-notvisited { background: #eee; color: #333; border: 1px solid #ccc; }
+.v-notanswered { background: #d9534f; }
+.v-answered { background: #5cb85c; }
+
+.question-palette {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    max-height: 250px;
+    overflow-y: auto;
+}
+.palette-item {
+    width: 40px; height: 35px; background: white; border: 1px solid #ccc; text-align: center;
+    line-height: 35px; cursor: pointer; font-size: 0.9rem;
+}
+.palette-item.active { border: 2px solid #007bff; font-weight: bold; }
+
+.palette-item.v-answered {
+    background-color: #5cb85c;
+    color: white;
+    border: 1px solid #4cae4c;
+}
+
+.palette-item.v-notanswered {
+    background-color: #d9534f;
+    color: white;
+    border: 1px solid #d43f3a;
+}
+
+
+/* Footer Buttons */
+.action-footer { background: #eee; padding: 10px; border-top: 1px solid #ccc; }
+.top-actions { display: flex; gap: 10px; margin-bottom: 10px; }
+.bottom-actions { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #ccc; padding-top: 10px; }
+
+.btn { padding: 8px 15px; font-size: 0.8rem; font-weight: bold; cursor: pointer; border: 1px solid #ccc; border-radius: 3px; }
+.btn-save { background: #5cb85c; color: white; }
+.btn-clear { background: white; }
+.btn-mark-next { background: #1c2b5e; color: white; }
+.btn-nav { background: white; border: 1px solid #ddd; padding: 8px 25px; }
+.btn-submit { background: #5cb85c; color: white; padding: 8px 30px; }
+
+/* Voice Instruction Overlay */
+.voice-instructions { background: #1c2b5e; color: white; padding: 5px 20px; font-size: 0.8rem; text-align: center; }
+
+/* Misc */
+.pulse { width: 12px; height: 12px; background: red; border-radius: 50%; animation: pulse-red 1.5s infinite; margin-bottom: 5px; }
+@keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); } }
+
+/* Mic Test UI */
+#mic-check-container { border: 1px solid #ddd; padding: 15px; margin: 20px; text-align: center; }
+#mic-meter-bg { width: 200px; height: 10px; background: #eee; margin: 10px auto; }
+#mic-meter-fill { height: 100%; background: #28a745; width: 0%; }

@@ -1,0 +1,28 @@
+[
+    {
+        "id": 1,
+        "type": "subjective",
+        "question": "Explain the importance of education in one's life."
+    },
+    {
+        "id": 2,
+        "type": "mcq",
+        "question": "What is the capital of India?",
+        "options": {
+            "A": "Mumbai",
+            "B": "New Delhi",
+            "C": "Kolkata",
+            "D": "Chennai"
+        }
+    },
+    {
+        "id": 3,
+        "type": "subjective",
+        "question": "What are the three laws of motion given by Newton?"
+    },
+    {
+        "id": 4,
+        "type": "subjective",
+        "question": "What are the 7 wonders of the world?"
+    }
+]

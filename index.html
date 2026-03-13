@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIT TESTING AGENCY - Voice Exam</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Portal Selection -->
+    <div id="portal-screen" class="screen-full">
+        <div class="jee-header">
+            <div class="logo-section">
+                <div class="nta-text">
+                    <h1 style="color: #1c2b5e; font-size: 2rem;">VIT TESTING AGENCY</h1>
+                    <p style="color: #28a745; font-weight: bold;">Excellence in Assessment</p>
+                </div>
+            </div>
+        </div>
+        <div class="portal-box">
+            <h2>Select Portal</h2>
+            <div class="portal-btns">
+                <button id="to-student-portal" class="btn btn-save">Student Entrance</button>
+                <button id="to-admin-login" class="btn btn-mark-next">Admin Portal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Login Screen -->
+    <div id="admin-login-screen" class="screen-full" style="display: none;">
+        <div class="login-box">
+            <h2>Admin Login</h2>
+            <input type="text" id="admin-username" placeholder="Username">
+            <input type="password" id="admin-password" placeholder="Password">
+            <button id="admin-login-btn" class="btn btn-save">Login</button>
+            <button class="btn-back" onclick="location.reload()">Back</button>
+        </div>
+    </div>
+
+    <!-- Student Entry Screen -->
+    <div id="student-entry-screen" class="screen-full" style="display: none;">
+        <div class="login-box">
+            <h2>Student Entrance</h2>
+            <p id="student-entry-instruction">Press ENTER to record your name, then press ENTER again to stop.</p>
+            <div id="student-name-display" style="margin: 15px; font-weight: bold; min-height: 24px; color: #1c2b5e;">[Waiting for command...]</div>
+            <button class="btn-back" onclick="location.reload()">Back</button>
+        </div>
+    </div>
+
+    <!-- Waiting Screen -->
+    <div id="waiting-screen" class="screen-full" style="display: none;">
+        <div class="login-box">
+            <div class="pulse" style="margin: 0 auto 20px;"></div>
+            <h2 id="waiting-title">Waiting for Authorization</h2>
+            <p id="waiting-message">Please wait for the Admin to authorize you...</p>
+        </div>
+    </div>
+
+    <!-- Start Screen (Countdown) -->
+    <div id="start-screen" class="screen-full" style="display: none;">
+        <div class="jee-header">
+            <div class="logo-section">
+                <div class="nta-text">
+                    <h1 style="color: #1c2b5e; font-size: 2rem;">VIT TESTING AGENCY</h1>
+                    <p style="color: #28a745; font-weight: bold;">Excellence in Assessment</p>
+                </div>
+            </div>
+        </div>
+        <div class="start-content" style="text-align: center;">
+            <h1 id="exam-title" style="margin-top: 50px;">Authorized</h1>
+            <div id="countdown-display" style="font-size: 8rem; font-weight: 900; color: #d9534f; margin: 20px;"></div>
+            <p id="start-instruction" class="hint" style="font-size: 1.5rem; font-weight: bold; color: #1c2b5e;"></p>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="admin-screen" class="screen-full" style="display: none; padding: 50px;">
+        <div class="admin-container">
+            <h2>Admin Dashboard</h2>
+            <div class="admin-section">
+                <h3>Authorize Students</h3>
+                <div id="waiting-students-list" class="responses-container"></div>
+            </div>
+            <div class="admin-section">
+                <h3>Exam Configuration</h3>
+                <label>Exam Duration (mins): </label>
+                <input type="number" id="exam-duration-input" value="60" style="width: 80px;">
+                <button id="save-config-btn" class="btn btn-save">Save Duration</button>
+            </div>
+            <div class="admin-section">
+                <h3>Upload Questions (.json)</h3>
+                <input type="file" id="question-upload" accept=".json">
+                <button id="upload-btn" class="btn btn-save">Upload</button>
+            </div>
+            <div class="admin-section">
+                <h3>Student Responses</h3>
+                <div id="responses-list" class="responses-container"></div>
+                <button id="refresh-responses" class="btn btn-nav">Refresh</button>
+            </div>
+            <button class="btn btn-clear" onclick="location.reload()">Logout</button>
+        </div>
+    </div>
+
+    <!-- Exam Screen -->
+    <div id="exam-screen" class="jee-container" style="display: none;">
+        <header class="jee-main-header">
+            <div class="nta-brand">
+                <div class="brand-text">
+                    <h2>VIT TESTING AGENCY</h2>
+                    <p>Excellence in Assessment</p>
+                </div>
+            </div>
+            <div class="candidate-info">
+                <div class="info-details">
+                    <p>Candidate : <span id="display-name" class="val"></span></p>
+                    <p>Remaining : <span id="timer" class="val">00:00:00</span></p>
+                </div>
+            </div>
+        </header>
+        <div class="main-layout">
+            <div class="question-area">
+                <h3 id="q-label">Question 1:</h3>
+                <div class="question-content">
+                    <div id="question-display" style="font-weight: bold; margin-bottom: 20px;"></div>
+                    <div id="options-container"></div>
+                    <div id="answer-container">
+                        <div id="recording-indicator" class="pulse" style="display: none;"></div>
+                        <p><strong>Your Response:</strong></p>
+                        <textarea id="answer-box" readonly></textarea>
+                    </div>
+                    <p id="status-indicator">Status: Ready</p>
+                </div>
+                <div class="action-footer">
+                    <button class="btn btn-save" id="manual-save-btn">SAVE & NEXT</button>
+                    <button class="btn btn-submit">SUBMIT EXAM</button>
+                </div>
+            </div>
+            <aside class="sidebar">
+                <div class="status-summary">
+                    <div class="stat"><span class="box v-answered"></span> Answered</div>
+                    <div class="stat"><span class="box v-notanswered"></span> Not Answered</div>
+                </div>
+                <div class="palette-header">Question Palette:</div>
+                <div class="question-palette" id="question-palette"></div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Finish Screen -->
+    <div id="finish-screen" class="screen-full" style="display: none;">
+        <div class="jee-header">
+            <div class="logo-section">
+                <div class="nta-text">
+                    <h1 style="color: #1c2b5e; font-size: 2rem;">VIT TESTING AGENCY</h1>
+                    <p style="color: #28a745; font-weight: bold;">Excellence in Assessment</p>
+                </div>
+            </div>
+        </div>
+        <div class="start-content" style="text-align: center;">
+            <h1 style="color: #1c2b5e; font-size: 3rem;">Exam Finished</h1>
+            <p id="finish-msg" style="font-size: 1.5rem; margin-top: 20px; font-weight: bold;">Your exam has finished. Thank you.</p>
+            <div class="pulse" style="margin: 30px auto;"></div>
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html>
