@@ -1,24 +1,73 @@
-# VIT TESTING AGENCY - Voice Exam System
+# 🎤 SPEAK – Voice Controlled Exam System
 
-A web-based proctored examination system featuring voice-activated controls, automated authorization, and an admin dashboard.
+## 📌 Overview
 
-## Project Structure
-- `index.html`: Main user interface and screen definitions.
-- `style.css`: JEE-inspired styling and layout management.
-- `script.js`: Core logic for voice recognition, Firebase integration, and exam flow.
-- `questions.json`: Local question bank (editable).
+SPEAK is a voice-enabled online examination system that allows students to take exams hands-free using speech. Admins can monitor, authorize, and manage exams in real time.
 
-## Features
-- **Hands-Free Operation**: Voice navigation and response recording using Web Speech API.
-- **Admin Portal**: 
-  - Authorize student entry.
-  - Set exam duration.
-  - Upload/update question sets.
-  - Download student responses as readable TXT files.
-- **Proctoring UI**: Real-time microphone monitoring and automated time warnings.
-- **Automated Flow**: Authorization countdown and automatic redirect upon completion.
+---
 
-## Setup
-1. Configure Firebase in `script.js`.
-2. Edit `questions.json` to add your assessment content.
-3. Open `index.html` in a web browser.
+## 🚀 Key Features
+
+### 👨‍🎓 Student Side
+
+* 🎤 Voice-based answer recording using Web Speech API
+* ⏳ Real-time exam timer with warnings
+* 📊 Question palette (Answered / Skipped / Not Visited)
+* 🔁 Automatic review of skipped questions
+
+### 👨‍💼 Admin Side
+
+* ✅ Authorize students before exam start
+* ⏱️ Set exam duration dynamically
+* 📂 Upload questions via JSON
+* 📥 Download student responses as TXT files
+* 🧹 Clear individual or all responses
+
+---
+
+## ⚙️ Tech Stack
+
+* HTML, CSS, JavaScript
+* Firebase Realtime Database
+* Web Speech API (Speech Recognition + Speech Synthesis)
+
+---
+
+## 🧠 How It Works
+
+1. Student enters name using voice
+2. Waits for admin authorization
+3. Admin approves from dashboard
+4. Exam starts with countdown
+5. Student answers using voice
+6. Responses saved in Firebase
+
+---
+
+## 📁 Project Structure
+
+* `index.html` → UI screens and layout
+* `style.css` → JEE-style UI design
+* `script.js` → Core logic (voice + Firebase + exam flow)
+* `questions.json` → Question bank
+
+---
+
+## 🎯 Future Improvements
+
+* 🔐 Firebase Authentication (Admin & Student login)
+* 🛡️ Anti-cheating system (tab switch detection)
+* 📊 Analytics dashboard (scores, time tracking)
+* ⌨️ Typing fallback for voice input
+
+---
+
+## 🌐 Live Demo
+
+(Coming soon – will be deployed on Vercel)
+
+---
+
+## 📌 Author
+
+Krishan Yadav
