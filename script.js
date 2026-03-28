@@ -47,21 +47,6 @@ let nameRecognition;
 
 // --- PORTAL NAVIGATION (VOICE & CURSOR FREE) ---
 
-function initPortalVoiceCommand() {
-    if (!SpeechRecognition) return;
-    portalRecognition = new SpeechRecognition();
-    portalRecognition.continuous = true;
-    portalRecognition.lang = 'en-US';
-    portalRecognition.onresult = (event) => {
-        const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
-        if (transcript.includes("student portal")) {
-            portalRecognition.stop();
-            goToStudentPortal();
-        }
-    };
-    portalRecognition.start();
-}
-
 function goToStudentPortal() {
     document.getElementById('portal-screen').style.display = 'none';
     document.getElementById('student-entry-screen').style.display = 'flex';
@@ -70,12 +55,10 @@ function goToStudentPortal() {
 
 // MAKE CLICKABLE: Student Entrance
 document.getElementById('to-student-portal').onclick = () => {
-    if (portalRecognition) portalRecognition.stop();
     goToStudentPortal();
 };
 
 document.getElementById('to-admin-login').onclick = () => {
-    if (portalRecognition) portalRecognition.stop();
     document.getElementById('portal-screen').style.display = 'none';
     document.getElementById('admin-login-screen').style.display = 'flex';
 };
@@ -182,7 +165,10 @@ function loadAdminDashboard() {
                     const item = document.createElement('div');
                     item.className = 'response-file-item';
                     item.innerHTML = `<span><strong style="font-size: 1.2rem; color: #d9534f; font-weight: 900;">${students[id].name}</strong></span>
-                                      <button class="btn btn-save" onclick="authorizeStudent('${id}')">Authorize</button>`;
+                                      <div style="display:flex; gap:10px;">
+                                        <button class="btn btn-save" onclick="authorizeStudent('${id}')">Authorize</button>
+                                        <button class="btn btn-clear" style="color:red; font-weight:bold;" onclick="clearStudent('${id}')">X</button>
+                                      </div>`;
                     list.appendChild(item);
                 }
             }
@@ -203,6 +189,26 @@ function loadAdminDashboard() {
 
 window.authorizeStudent = async (id) => {
     await update(ref(db, 'waiting_students/' + id), { status: 'authorized' });
+};
+
+window.clearStudent = async (id) => {
+    if(confirm("Clear this student?")) {
+        await remove(ref(db, 'waiting_students/' + id));
+    }
+};
+
+window.clearResponse = async (userId) => {
+    if(confirm("Clear response for " + userId + "?")) {
+        await remove(ref(db, 'exam_responses/' + userId));
+        refreshResponses();
+    }
+};
+
+window.clearAllResponses = async () => {
+    if(confirm("ARE YOU SURE? This will clear ALL student responses!")) {
+        await remove(ref(db, 'exam_responses'));
+        refreshResponses();
+    }
 };
 
 async function uploadQuestions() {
@@ -228,23 +234,43 @@ function refreshResponses() {
         list.innerHTML = "";
         if (snapshot.exists()) {
             const data = snapshot.val();
+            // Header with Clear All
+            const header = document.createElement('div');
+            header.style.marginBottom = "10px";
+            header.innerHTML = `<button class="btn btn-clear" style="background:#d9534f; color:white;" onclick="clearAllResponses()">CLEAR ALL RESPONSES</button>`;
+            list.appendChild(header);
+
             for (let userId in data) {
                 const item = document.createElement('div');
                 item.className = 'response-file-item';
                 item.innerHTML = `<span><strong>User:</strong> ${userId}</span>
-                                  <button class="btn btn-nav" onclick="downloadJSON('${userId}', ${JSON.stringify(data[userId]).replace(/"/g, '&quot;')})">Download</button>`;
+                                  <div style="display:flex; gap:5px;">
+                                    <button class="btn btn-nav" onclick="downloadTXT('${userId}', ${JSON.stringify(data[userId]).replace(/"/g, '&quot;')})">Download TXT</button>
+                                    <button class="btn btn-clear" style="color:red;" onclick="clearResponse('${userId}')">X</button>
+                                  </div>`;
                 list.appendChild(item);
             }
         } else { list.innerHTML = "No responses."; }
     });
 }
 
-window.downloadJSON = (name, data) => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+window.downloadTXT = (name, data) => {
+    let textContent = `EXAM RESPONSE: ${name}\n`;
+    textContent += `---------------------------\n\n`;
+
+    for (let qId in data) {
+        const q = data[qId];
+        textContent += `Question ${parseInt(qId)+1}: ${q.question}\n`;
+        textContent += `Answer: ${q.answer}\n`;
+        textContent += `Timestamp: ${new Date(q.timestamp).toLocaleString()}\n`;
+        textContent += `---------------------------\n`;
+    }
+
+    const blob = new Blob([textContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `response_${name}.json`;
+    a.download = `response_${name}.txt`;
     a.click();
 };
 
@@ -465,8 +491,14 @@ async function finishExam() {
     isExamStarted = false;
     document.getElementById('exam-screen').style.display = 'none';
     document.getElementById('finish-screen').style.display = 'block';
-    speak("Exam finished. Thank you.");
-    await remove(ref(db, 'waiting_students/' + currentUserId));
+
+    const finishMessage = "Your exam has finished. Thank you.";
+    speak(finishMessage, () => {
+        // REDIRECT TO HOME AFTER 2 SECONDS of speech completion
+        setTimeout(() => {
+            location.reload();
+        }, 2000);
+    });
 }
 
 function startTimer() {
@@ -488,9 +520,9 @@ function startTimer() {
 
 function startExam() {
     isExamStarted = true;
-    document.getElementById('display-name').innerText = currentUserName;
     document.getElementById('start-screen').style.display = 'none';
-    document.getElementById('exam-screen').style.display = 'block';
+    document.getElementById('exam-screen').style.display = 'flex';
+    document.getElementById('display-name').innerText = currentUserName;
     startTimer();
     loadQuestion();
 }
@@ -507,5 +539,4 @@ window.addEventListener('keydown', (e) => {
 });
 
 document.getElementById('manual-save-btn').onclick = saveAnswer;
-initPortalVoiceCommand();
 loadQuestions();
