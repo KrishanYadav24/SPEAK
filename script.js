@@ -35,6 +35,7 @@ let warningsGiven = { half: false, quarter: false };
 let isNameRecording = false;
 let isAuthorized = false;
 let isWaitingForStartEnter = false;
+let examStartTime = null;
 
 // Palette & Status States
 let questionStates = {};
@@ -42,10 +43,9 @@ let questionStates = {};
 const synth = window.speechSynthesis;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition;
-let portalRecognition;
 let nameRecognition;
 
-// --- PORTAL NAVIGATION (VOICE & CURSOR FREE) ---
+// --- PORTAL NAVIGATION ---
 
 function goToStudentPortal() {
     document.getElementById('portal-screen').style.display = 'none';
@@ -53,11 +53,7 @@ function goToStudentPortal() {
     speak("Student portal entered. Press enter to record, tell your name, and press enter again to stop.");
 }
 
-// MAKE CLICKABLE: Student Entrance
-document.getElementById('to-student-portal').onclick = () => {
-    goToStudentPortal();
-};
-
+document.getElementById('to-student-portal').onclick = () => goToStudentPortal();
 document.getElementById('to-admin-login').onclick = () => {
     document.getElementById('portal-screen').style.display = 'none';
     document.getElementById('admin-login-screen').style.display = 'flex';
@@ -101,7 +97,6 @@ async function submitStudentEntry() {
     document.getElementById('student-entry-screen').style.display = 'none';
     document.getElementById('waiting-screen').style.display = 'flex';
 
-    // Listen for authorization
     const authRef = ref(db, 'waiting_students/' + currentUserId);
     onValue(authRef, (snapshot) => {
         if (snapshot.exists()) {
@@ -115,25 +110,22 @@ async function submitStudentEntry() {
 }
 
 function runAuthorizationCountdown() {
-    // Hide waiting screen immediately to avoid being stuck
     document.getElementById('waiting-screen').style.display = 'none';
     document.getElementById('start-screen').style.display = 'flex';
-
-    // Update instructions visuals
-    document.getElementById('exam-title').innerText = "Authorized: Proceed to Exam";
-
-    loadQuestions(); // Load questions just before starting
+    loadQuestions();
     setupMicTest();
 
     speak("You have been authorized.", () => {
         let count = 5;
         const countdownLoop = () => {
             if (count > 0) {
+                document.getElementById('countdown-display').innerText = count;
                 speak(count.toString(), () => {
                     count--;
                     setTimeout(countdownLoop, 300);
                 });
             } else {
+                document.getElementById('countdown-display').innerText = "GO!";
                 speak("Press Enter to start the exam.");
                 isWaitingForStartEnter = true;
             }
@@ -142,7 +134,7 @@ function runAuthorizationCountdown() {
     });
 }
 
-// --- ADMIN FLOW ---
+// --- ADMIN DASHBOARD ---
 
 document.getElementById('admin-login-btn').onclick = () => {
     const user = document.getElementById('admin-username').value;
@@ -154,6 +146,39 @@ document.getElementById('admin-login-btn').onclick = () => {
     } else { alert("Invalid Admin Credentials"); }
 };
 
+// Toggle between sections
+function showAdminSection(sectionId) {
+    const sections = ['dashboard-view', 'students-view'];
+    sections.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = (id === sectionId) ? 'block' : 'none';
+    });
+
+    // Update active link
+    const navLinks = document.querySelectorAll('.sidebar-nav a');
+    navLinks.forEach(link => {
+        if (link.innerText.toLowerCase() === sectionId.replace('-view', '').toLowerCase()) {
+            link.classList.add('active');
+        } else if (link.innerText === "Dashboard" && sectionId === "dashboard-view") {
+             link.classList.add('active');
+        } else {
+            link.classList.remove('active');
+        }
+    });
+}
+
+// Assign click handlers for sidebar
+document.querySelectorAll('.sidebar-nav a').forEach(link => {
+    link.onclick = (e) => {
+        const text = e.target.innerText;
+        if (text === "Dashboard") showAdminSection('dashboard-view');
+        if (text === "Students") {
+            showAdminSection('students-view');
+            loadStudentsAnalytics();
+        }
+    };
+});
+
 function loadAdminDashboard() {
     onValue(ref(db, 'waiting_students'), (snapshot) => {
         const list = document.getElementById('waiting-students-list');
@@ -164,27 +189,95 @@ function loadAdminDashboard() {
                 if (students[id].status === 'waiting') {
                     const item = document.createElement('div');
                     item.className = 'response-file-item';
-                    item.innerHTML = `<span><strong style="font-size: 1.2rem; color: #d9534f; font-weight: 900;">${students[id].name}</strong></span>
-                                      <div style="display:flex; gap:10px;">
-                                        <button class="btn btn-save" onclick="authorizeStudent('${id}')">Authorize</button>
-                                        <button class="btn btn-clear" style="color:red; font-weight:bold;" onclick="clearStudent('${id}')">X</button>
+                    item.innerHTML = `<span><strong>${students[id].name}</strong></span>
+                                      <div class="controls-row">
+                                        <button class="admin-btn admin-btn-primary" onclick="authorizeStudent('${id}')">Authorize</button>
+                                        <button class="admin-btn admin-btn-secondary" style="color:red;" onclick="clearStudent('${id}')">X</button>
                                       </div>`;
                     list.appendChild(item);
                 }
             }
-        } else { list.innerHTML = "No students waiting."; }
+        } else { list.innerHTML = "<p style='padding:10px; color:#999;'>No students waiting.</p>"; }
     });
+
     get(ref(db, 'exam_config/duration')).then(snap => {
         if(snap.exists()) document.getElementById('exam-duration-input').value = snap.val();
     });
+
     document.getElementById('save-config-btn').onclick = async () => {
         const dur = document.getElementById('exam-duration-input').value;
         await set(ref(db, 'exam_config/duration'), dur);
         alert("Configuration saved!");
     };
+
     refreshResponses();
     document.getElementById('upload-btn').onclick = uploadQuestions;
     document.getElementById('refresh-responses').onclick = refreshResponses;
+}
+
+async function loadStudentsAnalytics() {
+    const container = document.getElementById('students-analytics-list');
+    container.innerHTML = "Loading analytics...";
+
+    const responsesSnap = await get(ref(db, 'exam_responses'));
+    const metadataSnap = await get(ref(db, 'exam_metadata'));
+    const questionsSnap = await get(ref(db, 'exam_questions'));
+
+    const totalQuestions = questionsSnap.exists() ? questionsSnap.val().length : 0;
+
+    container.innerHTML = "";
+
+    if (responsesSnap.exists()) {
+        const responses = responsesSnap.val();
+        const metadata = metadataSnap.exists() ? metadataSnap.val() : {};
+
+        for (let userId in responses) {
+            const userResponses = responses[userId];
+            const userMeta = metadata[userId] || {};
+
+            let attempted = 0;
+            for (let qIdx in userResponses) attempted++;
+
+            const skipped = totalQuestions - attempted;
+
+            // Format time taken
+            let timeStr = "N/A";
+            if (userMeta.startTime && userMeta.endTime) {
+                const diffMs = userMeta.endTime - userMeta.startTime;
+                const totalSecs = Math.floor(diffMs / 1000);
+                const mins = Math.floor(totalSecs / 60);
+                const secs = totalSecs % 60;
+                timeStr = `${mins}m ${secs}s`;
+            } else if (userMeta.startTime) {
+                timeStr = "In Progress";
+            }
+
+            const card = document.createElement('div');
+            card.className = 'admin-card';
+            card.style.marginBottom = "15px";
+            card.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <h4 style="color:#1c2b5e; margin:0;">${userId}</h4>
+                        <p style="font-size:0.85rem; color:#64748b; margin:5px 0;">Time Taken: <strong>${timeStr}</strong></p>
+                    </div>
+                    <div style="display:flex; gap:20px; text-align:center;">
+                        <div>
+                            <div style="font-size:1.2rem; font-weight:700; color:#22c55e;">${attempted}</div>
+                            <div style="font-size:0.7rem; color:#64748b; text-transform:uppercase;">Attempted</div>
+                        </div>
+                        <div>
+                            <div style="font-size:1.2rem; font-weight:700; color:#ef4444;">${skipped}</div>
+                            <div style="font-size:0.7rem; color:#64748b; text-transform:uppercase;">Skipped</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(card);
+        }
+    } else {
+        container.innerHTML = "<p>No student data available yet.</p>";
+    }
 }
 
 window.authorizeStudent = async (id) => {
@@ -200,13 +293,7 @@ window.clearStudent = async (id) => {
 window.clearResponse = async (userId) => {
     if(confirm("Clear response for " + userId + "?")) {
         await remove(ref(db, 'exam_responses/' + userId));
-        refreshResponses();
-    }
-};
-
-window.clearAllResponses = async () => {
-    if(confirm("ARE YOU SURE? This will clear ALL student responses!")) {
-        await remove(ref(db, 'exam_responses'));
+        await remove(ref(db, 'exam_metadata/' + userId));
         refreshResponses();
     }
 };
@@ -234,38 +321,26 @@ function refreshResponses() {
         list.innerHTML = "";
         if (snapshot.exists()) {
             const data = snapshot.val();
-            // Header with Clear All
-            const header = document.createElement('div');
-            header.style.marginBottom = "10px";
-            header.innerHTML = `<button class="btn btn-clear" style="background:#d9534f; color:white;" onclick="clearAllResponses()">CLEAR ALL RESPONSES</button>`;
-            list.appendChild(header);
-
             for (let userId in data) {
                 const item = document.createElement('div');
                 item.className = 'response-file-item';
-                item.innerHTML = `<span><strong>User:</strong> ${userId}</span>
-                                  <div style="display:flex; gap:5px;">
-                                    <button class="btn btn-nav" onclick="downloadTXT('${userId}', ${JSON.stringify(data[userId]).replace(/"/g, '&quot;')})">Download TXT</button>
-                                    <button class="btn btn-clear" style="color:red;" onclick="clearResponse('${userId}')">X</button>
+                item.innerHTML = `<span><strong>${userId}</strong></span>
+                                  <div class="controls-row">
+                                    <button class="admin-btn admin-btn-secondary" onclick="downloadTXT('${userId}', ${JSON.stringify(data[userId]).replace(/"/g, '&quot;')})">Download</button>
+                                    <button class="admin-btn admin-btn-secondary" style="color:red;" onclick="clearResponse('${userId}')">X</button>
                                   </div>`;
                 list.appendChild(item);
             }
-        } else { list.innerHTML = "No responses."; }
+        } else { list.innerHTML = "<p style='padding:10px; color:#999;'>No responses found.</p>"; }
     });
 }
 
 window.downloadTXT = (name, data) => {
-    let textContent = `EXAM RESPONSE: ${name}\n`;
-    textContent += `---------------------------\n\n`;
-
+    let textContent = `EXAM RESPONSE: ${name}\n\n`;
     for (let qId in data) {
         const q = data[qId];
-        textContent += `Question ${parseInt(qId)+1}: ${q.question}\n`;
-        textContent += `Answer: ${q.answer}\n`;
-        textContent += `Timestamp: ${new Date(q.timestamp).toLocaleString()}\n`;
-        textContent += `---------------------------\n`;
+        textContent += `Q${parseInt(qId)+1}: ${q.question}\nAnswer: ${q.answer}\n\n`;
     }
-
     const blob = new Blob([textContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -278,18 +353,11 @@ window.downloadTXT = (name, data) => {
 
 async function loadQuestions() {
     try {
-        // ALWAYS fetch the local file first to ensure user edits are captured
         const res = await fetch('questions.json?' + Date.now());
-        if (res.ok) {
-            questions = await res.json();
-            console.log("Questions loaded from local JSON file.");
-        } else {
-            // Fallback to Firebase if local file fails
+        if (res.ok) questions = await res.json();
+        else {
             const qSnap = await get(ref(db, 'exam_questions'));
-            if (qSnap.exists()) {
-                questions = qSnap.val();
-                console.log("Questions loaded from Firebase.");
-            }
+            if (qSnap.exists()) questions = qSnap.val();
         }
 
         const cSnap = await get(ref(db, 'exam_config/duration'));
@@ -298,34 +366,13 @@ async function loadQuestions() {
         questionStates = {};
         questions.forEach((_, i) => questionStates[i] = 0);
         renderPalette();
-        updateCounts();
-    } catch (e) {
-        console.error("Error loading questions:", e);
-    }
+    } catch (e) { console.error("Error loading questions:", e); }
 }
 
 async function setupMicTest() {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const analyser = audioContext.createAnalyser();
-        const microphone = audioContext.createMediaStreamSource(stream);
-        const javascriptNode = audioContext.createScriptProcessor(2048, 1, 1);
-        analyser.smoothingTimeConstant = 0.8;
-        analyser.fftSize = 1024;
-        microphone.connect(analyser);
-        analyser.connect(javascriptNode);
-        javascriptNode.connect(audioContext.destination);
-        javascriptNode.onaudioprocess = () => {
-            const array = new Uint8Array(analyser.frequencyBinCount);
-            analyser.getByteFrequencyData(array);
-            let values = 0;
-            for (let i = 0; i < array.length; i++) values += array[i];
-            const average = values / array.length;
-            if (document.getElementById('mic-meter-fill')) document.getElementById('mic-meter-fill').style.width = Math.min(average * 2, 100) + "%";
-            if (document.getElementById('live-mic-fill')) document.getElementById('live-mic-fill').style.width = Math.min(average * 2, 100) + "%";
-        };
-    } catch (e) { console.error(e); }
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) { console.error("Mic access denied"); }
 }
 
 if (SpeechRecognition) {
@@ -341,8 +388,7 @@ if (SpeechRecognition) {
     recognition.onresult = (event) => {
         let transcript = "";
         for (let i = 0; i < event.results.length; i++) transcript += event.results[i][0].transcript;
-        const filtered = transcript.replace(/recording started/gi, "").trim();
-        currentAnswer = filtered;
+        currentAnswer = transcript.trim();
         document.getElementById('answer-box').value = currentAnswer;
     };
     recognition.onend = () => {
@@ -356,28 +402,23 @@ function renderPalette() {
     const palette = document.getElementById('question-palette');
     if (!palette) return;
     palette.innerHTML = "";
+
+    const activeIdx = isReviewingSkipped ? skippedIndices[currentSkippedPtr] : currentIndex;
+
     questions.forEach((_, i) => {
         const item = document.createElement('div');
         item.className = 'palette-item';
-        item.innerText = (i + 1).toString().padStart(2, '0');
-        if (i === (isReviewingSkipped ? skippedIndices[currentSkippedPtr] : currentIndex)) item.classList.add('active');
-        if (questionStates[i] === 1) item.classList.add('v-notanswered');
-        else if (questionStates[i] === 2) item.classList.add('v-answered');
-        else item.classList.add('v-notvisited');
+        if (i === activeIdx) item.classList.add('active');
+
+        if (questionStates[i] === 2) {
+            item.classList.add('v-answered');
+        } else if (questionStates[i] === 1) {
+            item.classList.add('v-notanswered');
+        }
+
+        item.innerText = i + 1;
         palette.appendChild(item);
     });
-}
-
-function updateCounts() {
-    let visited = 0, answered = 0, skipped = 0;
-    Object.values(questionStates).forEach(state => {
-        if (state === 0) visited++;
-        else if (state === 1) skipped++;
-        else if (state === 2) answered++;
-    });
-    if (document.getElementById('count-notvisited')) document.getElementById('count-notvisited').innerText = visited;
-    if (document.getElementById('count-notanswered')) document.getElementById('count-notanswered').innerText = skipped;
-    if (document.getElementById('count-answered')) document.getElementById('count-answered').innerText = answered;
 }
 
 function speak(text, callback) {
@@ -391,13 +432,16 @@ function loadQuestion() {
     let qIdx = isReviewingSkipped ? skippedIndices[currentSkippedPtr] : currentIndex;
     const q = questions[qIdx];
     if (questionStates[qIdx] === 0) questionStates[qIdx] = 1;
-    document.getElementById('q-label').innerText = `Question ${qIdx + 1}:`;
+
+    document.getElementById('q-label').innerHTML = `<span class="question-number-tag">Question ${qIdx + 1}/${questions.length}:</span>`;
     document.getElementById('question-display').innerText = q.question;
+
     const optCont = document.getElementById('options-container');
     optCont.innerHTML = "";
     document.getElementById('answer-box').value = "";
     currentAnswer = "";
     isVerifyingAnswer = false;
+
     let speechText = `Question ${qIdx + 1}. ${q.question}. `;
     if (q.type === 'mcq') {
         for (let [key, val] of Object.entries(q.options)) {
@@ -405,34 +449,30 @@ function loadQuestion() {
             speechText += `Option ${key}, ${val}. `;
         }
     }
+
     renderPalette();
-    updateCounts();
     speak(speechText + " Press Enter to record.");
 }
 
 function handleEnter() {
-    // If waiting for the final start command
     if (isWaitingForStartEnter) {
         isWaitingForStartEnter = false;
         startExam();
         return;
     }
-
-    // If on student entry screen (name recording)
     if (document.getElementById('student-entry-screen').style.display === 'flex') {
         handleNameEntryVoice();
         return;
     }
-
     if (isVerifyingAnswer === true) { saveAnswer(); return; }
     if (!isRecording) {
         currentAnswer = "";
         document.getElementById('answer-box').value = "";
-        speak("Recording started.", () => {
-            recognition.start();
-        });
+        speak("Recording started.", () => recognition.start());
+    } else {
+        isVerifyingAnswer = 'pending';
+        recognition.stop();
     }
-    else { isVerifyingAnswer = 'pending'; recognition.stop(); }
 }
 
 function processRecordedAnswer() {
@@ -441,7 +481,7 @@ function processRecordedAnswer() {
         speak("I didn't hear anything. Try again.");
     } else {
         isVerifyingAnswer = true;
-        speak(`You said: ${currentAnswer}. Press Enter to save.`);
+        speak(`You said: ${currentAnswer}. Press Enter to save or R to rerecord.`);
     }
 }
 
@@ -460,7 +500,9 @@ async function saveAnswer() {
 
 function skipQuestion() {
     let qIdx = isReviewingSkipped ? skippedIndices[currentSkippedPtr] : currentIndex;
-    if (!isReviewingSkipped) skippedIndices.push(qIdx);
+    if (!isReviewingSkipped) {
+        if (!skippedIndices.includes(qIdx)) skippedIndices.push(qIdx);
+    }
     questionStates[qIdx] = 1;
     speak("Skipped.");
     moveToNext();
@@ -489,28 +531,24 @@ function startReview() {
 
 async function finishExam() {
     isExamStarted = false;
-    document.getElementById('exam-screen').style.display = 'none';
-    document.getElementById('finish-screen').style.display = 'block';
 
-    const finishMessage = "Your exam has finished. Thank you.";
-    speak(finishMessage, () => {
-        // REDIRECT TO HOME AFTER 2 SECONDS of speech completion
-        setTimeout(() => {
-            location.reload();
-        }, 2000);
+    // Save metadata
+    if (currentUserId) {
+        await update(ref(db, 'exam_metadata/' + currentUserId), {
+            endTime: Date.now()
+        });
+    }
+
+    document.getElementById('exam-screen').style.display = 'none';
+    document.getElementById('finish-screen').style.display = 'flex';
+    speak("Your exam has finished. Thank you.", () => {
+        setTimeout(() => location.reload(), 5000);
     });
 }
 
 function startTimer() {
     timerInterval = setInterval(() => {
         timeLeft--;
-        if (timeLeft === Math.floor(totalTime / 2) && !warningsGiven.half) {
-            speak("Time Warning. Half of the exam time is remaining.");
-            warningsGiven.half = true;
-        } else if (timeLeft === Math.floor(totalTime / 4) && !warningsGiven.quarter) {
-            speak("Time Warning. One quarter of the exam time is remaining.");
-            warningsGiven.quarter = true;
-        }
         let mins = Math.floor(timeLeft / 60);
         let secs = timeLeft % 60;
         document.getElementById('timer').innerText = `Time Left: ${mins}:${secs.toString().padStart(2, '0')}`;
@@ -518,8 +556,18 @@ function startTimer() {
     }, 1000);
 }
 
-function startExam() {
+async function startExam() {
     isExamStarted = true;
+    examStartTime = Date.now();
+
+    // Save metadata
+    if (currentUserId) {
+        await set(ref(db, 'exam_metadata/' + currentUserId), {
+            startTime: examStartTime,
+            name: currentUserName
+        });
+    }
+
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('exam-screen').style.display = 'flex';
     document.getElementById('display-name').innerText = currentUserName;
@@ -527,16 +575,28 @@ function startExam() {
     loadQuestion();
 }
 
+function handleRKey() {
+    if (!isExamStarted) return;
+
+    if (isVerifyingAnswer === true) {
+        // Rerecord logic
+        window.speechSynthesis.cancel();
+        isVerifyingAnswer = false;
+        currentAnswer = "";
+        document.getElementById('answer-box').value = "";
+        speak("Recording restarted.", () => recognition.start());
+    } else if (!isRecording) {
+        // Repeat question logic
+        loadQuestion();
+    }
+}
+
 window.addEventListener('keydown', (e) => {
-    if (document.activeElement.tagName === 'INPUT') return;
+    if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
     const key = e.key.toLowerCase();
     if (key === 'enter') handleEnter();
-    else if (key === 'r' && isExamStarted) {
-        if (isVerifyingAnswer) { isVerifyingAnswer = false; handleEnter(); }
-        else loadQuestion();
-    }
     else if (key === 's' && isExamStarted && !isRecording && !isVerifyingAnswer) skipQuestion();
+    else if (key === 'r') handleRKey();
 });
 
 document.getElementById('manual-save-btn').onclick = saveAnswer;
-loadQuestions();
