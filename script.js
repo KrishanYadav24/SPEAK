@@ -45,16 +45,21 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 let recognition;
 let nameRecognition;
 
+let isVerifyingName = false;
+
 // --- PORTAL NAVIGATION ---
 
 function goToStudentPortal() {
+    document.getElementById('to-student-portal').blur();
     document.getElementById('portal-screen').style.display = 'none';
     document.getElementById('student-entry-screen').style.display = 'flex';
+    isVerifyingName = false;
     speak("Student portal entered. Press enter to record, tell your name, and press enter again to stop.");
 }
 
 document.getElementById('to-student-portal').onclick = () => goToStudentPortal();
 document.getElementById('to-admin-login').onclick = () => {
+    document.getElementById('to-admin-login').blur();
     document.getElementById('portal-screen').style.display = 'none';
     document.getElementById('admin-login-screen').style.display = 'flex';
 };
@@ -62,11 +67,25 @@ document.getElementById('to-admin-login').onclick = () => {
 // --- STUDENT FLOW ---
 
 function handleNameEntryVoice() {
+    if (isVerifyingName) {
+        // Confirmation state: Enter was pressed to proceed
+        isVerifyingName = false;
+        speak("Name confirmed. Wait for authorization.");
+        submitStudentEntry();
+        return;
+    }
+
     if (isNameRecording) {
         isNameRecording = false;
-        if (nameRecognition) nameRecognition.stop();
+        if (nameRecognition) {
+            try { nameRecognition.stop(); } catch(e) {}
+        }
     } else {
         isNameRecording = true;
+        isVerifyingName = false;
+        currentUserName = "";
+        window.speechSynthesis.cancel();
+
         nameRecognition = new SpeechRecognition();
         nameRecognition.lang = 'en-US';
         nameRecognition.onstart = () => {
@@ -78,10 +97,23 @@ function handleNameEntryVoice() {
             document.getElementById('student-name-display').innerText = "Detected: " + name;
         };
         nameRecognition.onend = () => {
-            if (currentUserName && !isNameRecording) {
-                speak(currentUserName + ". Wait for authorization.");
-                submitStudentEntry();
+            if (currentUserName && !isVerifyingName) {
+                isNameRecording = false;
+                isVerifyingName = true;
+                const spelledName = currentUserName.split('').join(' ');
+                speak(`I heard ${currentUserName}. Spelled as ${spelledName}. Press Enter to proceed or R to re-record.`, () => {
+                    document.getElementById('student-name-display').innerText = `Confirm: ${currentUserName} (Enter: Yes / R: No)`;
+                });
+            } else if (!currentUserName) {
+                isNameRecording = false;
+                speak("I was unable to hear your name. Press enter to re-record.", () => {
+                    document.getElementById('student-name-display').innerText = "Unable to hear. Press ENTER to try again.";
+                });
             }
+        };
+        nameRecognition.onerror = (e) => {
+            isNameRecording = false;
+            document.getElementById('student-name-display').innerText = "Mic error. Press ENTER to try again.";
         };
         nameRecognition.start();
     }
@@ -137,8 +169,8 @@ function runAuthorizationCountdown() {
 // --- ADMIN DASHBOARD ---
 
 document.getElementById('admin-login-btn').onclick = () => {
-    const user = document.getElementById('admin-username').value;
-    const pass = document.getElementById('admin-password').value;
+    const user = document.getElementById('admin-username').value.trim();
+    const pass = document.getElementById('admin-password').value.trim();
     if (user === 'admin' && pass === 'admin123') {
         document.getElementById('admin-login-screen').style.display = 'none';
         document.getElementById('admin-screen').style.display = 'flex';
@@ -180,39 +212,81 @@ document.querySelectorAll('.sidebar-nav a').forEach(link => {
 });
 
 function loadAdminDashboard() {
-    onValue(ref(db, 'waiting_students'), (snapshot) => {
-        const list = document.getElementById('waiting-students-list');
+    console.log("Loading Admin Dashboard...");
+    const list = document.getElementById('waiting-students-list');
+
+    // Clear and show loading state
+    if (list) list.innerHTML = "<p style='padding:20px; color:#94a3b8; text-align:center;'>Connecting to server...</p>";
+
+    // Real-time listener for waiting students
+    const waitingRef = ref(db, 'waiting_students');
+    onValue(waitingRef, (snapshot) => {
+        if (!list) return;
         list.innerHTML = "";
+        let hasWaiting = false;
+
         if (snapshot.exists()) {
             const students = snapshot.val();
             for (let id in students) {
-                if (students[id].status === 'waiting') {
+                const student = students[id];
+                if (student && student.status === 'waiting') {
+                    hasWaiting = true;
                     const item = document.createElement('div');
-                    item.className = 'response-file-item';
-                    item.innerHTML = `<span><strong>${students[id].name}</strong></span>
-                                      <div class="controls-row">
-                                        <button class="admin-btn admin-btn-primary" onclick="authorizeStudent('${id}')">Authorize</button>
-                                        <button class="admin-btn admin-btn-secondary" style="color:red;" onclick="clearStudent('${id}')">X</button>
-                                      </div>`;
+                    item.style.display = "flex";
+                    item.style.justifyContent = "space-between";
+                    item.style.alignItems = "center";
+                    item.style.padding = "12px 15px";
+                    item.style.background = "white";
+                    item.style.border = "1px solid #e2e8f0";
+                    item.style.borderRadius = "10px";
+                    item.style.marginBottom = "10px";
+                    item.style.boxShadow = "0 2px 4px rgba(0,0,0,0.02)";
+
+                    item.innerHTML = `
+                        <div style="display:flex; flex-direction:column;">
+                            <span style="font-weight:700; color:#1e293b;">${student.name}</span>
+                            <span style="font-size:0.75rem; color:#94a3b8;">ID: ${id}</span>
+                        </div>
+                        <div style="display:flex; gap:10px;">
+                            <button class="admin-btn admin-btn-primary" style="width:auto; padding:8px 15px; font-size:0.85rem;" onclick="authorizeStudent('${id}')">Authorize</button>
+                            <button class="admin-btn admin-btn-secondary" style="width:auto; padding:8px 12px; color:#ef4444; font-size:0.85rem;" onclick="clearStudent('${id}')">X</button>
+                        </div>`;
                     list.appendChild(item);
                 }
             }
-        } else { list.innerHTML = "<p style='padding:10px; color:#999;'>No students waiting.</p>"; }
+        }
+
+        if (!hasWaiting) {
+            list.innerHTML = "<p style='padding:20px; color:#94a3b8; text-align:center;'>No students waiting for authorization.</p>";
+        }
+    }, (error) => {
+        console.error("Firebase error:", error);
+        if (list) list.innerHTML = "<p style='padding:20px; color:red; text-align:center;'>Error connecting to Firebase.</p>";
     });
 
+    // Load current duration
     get(ref(db, 'exam_config/duration')).then(snap => {
-        if(snap.exists()) document.getElementById('exam-duration-input').value = snap.val();
+        const input = document.getElementById('exam-duration-input');
+        if(snap.exists() && input) input.value = snap.val();
     });
 
-    document.getElementById('save-config-btn').onclick = async () => {
-        const dur = document.getElementById('exam-duration-input').value;
-        await set(ref(db, 'exam_config/duration'), dur);
-        alert("Configuration saved!");
-    };
+    // Re-attach listeners that might have been lost
+    const saveBtn = document.getElementById('save-config-btn');
+    if (saveBtn) {
+        saveBtn.onclick = async () => {
+            const dur = document.getElementById('exam-duration-input').value;
+            await set(ref(db, 'exam_config/duration'), dur);
+            alert("Exam duration updated to " + dur + " minutes.");
+        };
+    }
+
+    const uploadBtn = document.getElementById('upload-btn');
+    if (uploadBtn) uploadBtn.onclick = uploadQuestions;
+
+    const refreshBtn = document.getElementById('refresh-responses');
+    if (refreshBtn) refreshBtn.onclick = () => refreshResponses(false);
 
     refreshResponses();
-    document.getElementById('upload-btn').onclick = uploadQuestions;
-    document.getElementById('refresh-responses').onclick = refreshResponses;
 }
 
 async function loadStudentsAnalytics() {
@@ -314,26 +388,50 @@ async function uploadQuestions() {
     reader.readAsText(file);
 }
 
-function refreshResponses() {
+function refreshResponses(silent = false) {
     const list = document.getElementById('responses-list');
-    list.innerHTML = "Loading...";
+    if (!list) return;
+    if (!silent) list.innerHTML = "Loading...";
+
     get(ref(db, 'exam_responses')).then((snapshot) => {
         list.innerHTML = "";
         if (snapshot.exists()) {
             const data = snapshot.val();
+            window._examDataStore = data;
             for (let userId in data) {
                 const item = document.createElement('div');
-                item.className = 'response-file-item';
+                item.style.display = "flex";
+                item.style.justifyContent = "space-between";
+                item.style.alignItems = "center";
+                item.style.padding = "12px 15px";
+                item.style.background = "white";
+                item.style.border = "1px solid #e2e8f0";
+                item.style.borderRadius = "10px";
+                item.style.marginBottom = "10px";
+
                 item.innerHTML = `<span><strong>${userId}</strong></span>
-                                  <div class="controls-row">
-                                    <button class="admin-btn admin-btn-secondary" onclick="downloadTXT('${userId}', ${JSON.stringify(data[userId]).replace(/"/g, '&quot;')})">Download</button>
-                                    <button class="admin-btn admin-btn-secondary" style="color:red;" onclick="clearResponse('${userId}')">X</button>
+                                  <div style="display:flex; gap:10px;">
+                                    <button class="admin-btn admin-btn-secondary" style="width:auto; padding:8px 12px;" onclick="downloadTXTFromStore('${userId}')">Download</button>
+                                    <button class="admin-btn admin-btn-secondary" style="width:auto; padding:8px 12px; color:red;" onclick="clearResponse('${userId}')">X</button>
                                   </div>`;
                 list.appendChild(item);
             }
-        } else { list.innerHTML = "<p style='padding:10px; color:#999;'>No responses found.</p>"; }
+        } else {
+            list.innerHTML = "<p style='padding:20px; color:#94a3b8; text-align:center;'>No responses found.</p>";
+        }
+    }).catch(err => {
+        console.error(err);
+        if (!silent) list.innerHTML = "Error loading responses.";
     });
 }
+
+// Periodic Refresh for Admin (Every 2 seconds)
+setInterval(() => {
+    const adminScreen = document.getElementById('admin-screen');
+    if (adminScreen && adminScreen.style.display === 'flex') {
+        refreshResponses(true); // Silent refresh
+    }
+}, 2000);
 
 window.downloadTXT = (name, data) => {
     let textContent = `EXAM RESPONSE: ${name}\n\n`;
@@ -576,6 +674,19 @@ async function startExam() {
 }
 
 function handleRKey() {
+    // Case 1: Name entry screen
+    if (document.getElementById('student-entry-screen').style.display === 'flex') {
+        if (isVerifyingName || isNameRecording) {
+            window.speechSynthesis.cancel();
+            isNameRecording = false;
+            isVerifyingName = false;
+            currentUserName = "";
+            document.getElementById('student-name-display').innerText = "[Waiting for command...]";
+            handleNameEntryVoice(); // Restart recording
+            return;
+        }
+    }
+
     if (!isExamStarted) return;
 
     if (isVerifyingAnswer === true) {
