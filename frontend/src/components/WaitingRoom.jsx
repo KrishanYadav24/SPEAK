@@ -5,38 +5,44 @@ const WaitingRoom = ({ name, isAuthorized, onCountdownEnd }) => {
   const [count, setCount] = useState(5);
   const timerStartedRef = useRef(false);
 
-  const speak = (text, callback) => {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-IN';
-    utterance.onend = () => callback?.();
-    window.speechSynthesis.speak(utterance);
-  };
-
   useEffect(() => {
     if (isAuthorized && !timerStartedRef.current) {
       timerStartedRef.current = true;
 
-      // Initial announcement including the first number
-      speak("You got authorized. Exam starts in 5");
+      const runSequence = async () => {
+        // Helper to speak and wait for completion
+        const speakPromise = (text) => {
+          return new Promise((resolve) => {
+            window.speechSynthesis.cancel(); // Clear any hung speech
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-IN';
+            utterance.rate = 1; // Natural speed
+            utterance.onend = () => resolve();
+            utterance.onerror = () => resolve(); // Prevent hang on error
+            window.speechSynthesis.speak(utterance);
+          });
+        };
 
-      const interval = setInterval(() => {
-        setCount((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            speak("Exam begins", () => {
-              onCountdownEnd();
-            });
-            return 0;
-          }
-          const next = prev - 1;
-          speak(next.toString());
-          return next;
-        });
-      }, 1000);
+        // 1. Initial Announcement
+        await speakPromise("You have been authorized.");
+
+        // 2. Countdown Sequence (5 down to 1)
+        for (let i = 5; i >= 1; i--) {
+          setCount(i);
+          await speakPromise(i.toString());
+        }
+
+        // 3. Final Announcement
+        setCount(0);
+        await speakPromise("The exam begins.");
+
+        // 4. Transition
+        onCountdownEnd();
+      };
+
+      runSequence();
 
       return () => {
-        clearInterval(interval);
         window.speechSynthesis.cancel();
       };
     }
@@ -89,7 +95,7 @@ const WaitingRoom = ({ name, isAuthorized, onCountdownEnd }) => {
                 className="text-[120px] font-black text-red-600 leading-none mb-8 animate-bounce"
                 role="timer"
                 aria-live="assertive"
-                aria-label={`Starts in ${count > 0 ? count : 'Go'}`}
+                aria-label={count > 0 ? `Starts in ${count}` : 'Exam begins'}
              >
                 {count > 0 ? count : "GO"}
              </div>
