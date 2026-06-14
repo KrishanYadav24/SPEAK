@@ -36,12 +36,31 @@ const ExamInterface = ({ user, config, onFinish }) => {
 
     const timer = setInterval(() => {
       setTimeLeft(prev => {
-        if (prev <= 1) {
+        const nextTime = prev - 1;
+
+        // Periodic audio announcements for accessibility
+        const minutes = nextTime / 60;
+        if (nextTime > 0) {
+          if (minutes === 30 || minutes === 15 || minutes === 5 || minutes === 2) {
+            speak(`${minutes} minutes remaining.`);
+          } else if (nextTime === 60) {
+            speak("One minute remaining.");
+          } else if (nextTime === 30) {
+            speak("30 seconds remaining.");
+          } else if (nextTime <= 10 && nextTime > 0) {
+             // Optional: count down last 10 seconds? User might find it too noisy,
+             // but good for high stakes. For now, just the minutes/half-minute.
+          }
+        }
+
+        if (nextTime <= 0) {
           clearInterval(timer);
-          onFinish();
+          speak("Time is up. Your exam is being submitted automatically.", () => {
+            onFinish();
+          });
           return 0;
         }
-        return prev - 1;
+        return nextTime;
       });
     }, 1000);
 

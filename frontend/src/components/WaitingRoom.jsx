@@ -3,7 +3,7 @@ import { Loader2, ShieldCheck, Timer } from 'lucide-react';
 
 const WaitingRoom = ({ name, isAuthorized, onCountdownEnd }) => {
   const [count, setCount] = useState(5);
-  const hasSpokenRef = useRef(false);
+  const timerStartedRef = useRef(false);
 
   const speak = (text, callback) => {
     window.speechSynthesis.cancel();
@@ -14,28 +14,33 @@ const WaitingRoom = ({ name, isAuthorized, onCountdownEnd }) => {
   };
 
   useEffect(() => {
-    if (isAuthorized) {
-      if (!hasSpokenRef.current) {
-        speak("You got authorized. Exam starts in...");
-        hasSpokenRef.current = true;
-      }
+    if (isAuthorized && !timerStartedRef.current) {
+      timerStartedRef.current = true;
 
-      if (count > 0) {
-        const timer = setTimeout(() => {
-          const nextCount = count - 1;
-          setCount(nextCount);
-          if (nextCount > 0) {
-            speak(nextCount.toString());
-          } else {
+      // Initial announcement including the first number
+      speak("You got authorized. Exam starts in 5");
+
+      const interval = setInterval(() => {
+        setCount((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
             speak("Exam begins", () => {
               onCountdownEnd();
             });
+            return 0;
           }
-        }, 1000);
-        return () => clearTimeout(timer);
-      }
+          const next = prev - 1;
+          speak(next.toString());
+          return next;
+        });
+      }, 1000);
+
+      return () => {
+        clearInterval(interval);
+        window.speechSynthesis.cancel();
+      };
     }
-  }, [isAuthorized, count, onCountdownEnd]);
+  }, [isAuthorized, onCountdownEnd]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 text-center font-inter">
