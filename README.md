@@ -94,11 +94,6 @@ npm run dev
 
 ---
 
-## 📖 Admin Credentials
-*   **Username**: `admin`
-*   **Password**: `admin123`
-
----
 
 ## 🎯 Future Roadmap
 - [ ] **Proctoring**: Tab-switch detection and face-tracking using TensorFlow.js.
