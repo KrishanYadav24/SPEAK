@@ -200,13 +200,20 @@ const ExamInterface = ({ user, config, onFinish }) => {
     }
   };
 
-  if (!questions.length) return null;
+  if (!questions.length) return <div role="status">Loading questions...</div>;
   const q = questions[currentIdx];
 
   return (
-    <div className="h-screen flex flex-col bg-white overflow-hidden outline-none" onKeyDown={handleKeyDown} tabIndex={0} autoFocus>
+    <div
+      className="h-screen flex flex-col bg-white overflow-hidden outline-none"
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+      autoFocus
+      role="main"
+      aria-label={`Exam Interface: Question ${currentIdx + 1} of ${questions.length}`}
+    >
       {/* JEE MAIN HEADER */}
-      <header className="flex justify-between items-center px-8 py-4 border-b-2 border-[#e2e8f0] min-h-[80px]">
+      <header className="flex justify-between items-center px-8 py-4 border-b-2 border-[#e2e8f0] min-h-[80px]" role="banner">
         <div className="text-center">
           <p className="text-[0.9rem] text-[#28a745] font-bold uppercase tracking-[1.5px] mt-1">Excellence in Assessment</p>
         </div>
@@ -221,44 +228,63 @@ const ExamInterface = ({ user, config, onFinish }) => {
 
       <div className="flex flex-1 overflow-hidden">
         {/* QUESTION AREA */}
-        <main className="flex-1 p-10 overflow-y-auto flex flex-col relative">
+        <main className="flex-1 p-10 overflow-y-auto flex flex-col relative" role="region" aria-labelledby="question-heading">
           <div className="border-b-2 border-[#f1f5f9] pb-5 mb-8">
-            <h3 className="text-[1.1rem] text-[#1c2b5e] font-bold mb-2 uppercase">Question {currentIdx + 1} of {questions.length}:</h3>
-            <div className="text-[1.35rem] font-semibold text-[#0f172a] leading-relaxed">{q.question}</div>
+            <h3 id="question-heading" className="text-[1.1rem] text-[#1c2b5e] font-bold mb-2 uppercase">
+              Question {currentIdx + 1} of {questions.length}:
+            </h3>
+            <div className="text-[1.35rem] font-semibold text-[#0f172a] leading-relaxed" aria-describedby="question-text">
+              <p id="question-text">{q.question}</p>
+            </div>
           </div>
 
-          <div className="space-y-3 mb-8">
-            {q.type === 'mcq' && q.options && Object.entries(q.options).map(([key, val]) => (
-              <div key={key} className={`p-4 border-2 rounded-xl text-[1.1rem] font-medium transition-all duration-300
-                ${(isVerifyingAnswer || answers[currentIdx]) && fuzzyMatch(isVerifyingAnswer ? currentAnswer : (answers[currentIdx] || ""), q.options) === key
-                  ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm'
-                  : 'bg-[#f8fafc] border-[#e2e8f0] text-slate-600 hover:border-slate-300'}`}>
-                <span className="font-bold mr-3">{key}.</span> {val}
-              </div>
-            ))}
+          <div className="space-y-3 mb-8" role="radiogroup" aria-label="Options">
+            {q.type === 'mcq' && q.options && Object.entries(q.options).map(([key, val]) => {
+              const isSelected = (isVerifyingAnswer || answers[currentIdx]) && fuzzyMatch(isVerifyingAnswer ? currentAnswer : (answers[currentIdx] || ""), q.options) === key;
+              return (
+                <div key={key}
+                  role="radio"
+                  aria-checked={isSelected}
+                  className={`p-4 border-2 rounded-xl text-[1.1rem] font-medium transition-all duration-300
+                    ${isSelected
+                      ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm'
+                      : 'bg-[#f8fafc] border-[#e2e8f0] text-slate-600 hover:border-slate-300'}`}>
+                  <span className="font-bold mr-3">{key}.</span> {val}
+                </div>
+              );
+            })}
           </div>
 
-          <div className={`relative p-6 transition-all duration-500 rounded-xl mb-4 border-2
-            ${isListening ? 'bg-blue-50/50 border-blue-400 shadow-lg' : 'bg-[#fffdf0] border-[#fde68a]'}`}>
+          <div
+            className={`relative p-6 transition-all duration-500 rounded-xl mb-4 border-2
+              ${isListening ? 'bg-blue-50/50 border-blue-400 shadow-lg' : 'bg-[#fffdf0] border-[#fde68a]'}`}
+            aria-live="polite"
+          >
             {isListening && (
-                <div id="recording-indicator" className="absolute top-4 right-4 flex items-center gap-2">
+                <div id="recording-indicator" className="absolute top-4 right-4 flex items-center gap-2" role="alert">
                     <span className="text-[0.7rem] font-bold text-red-500 animate-pulse uppercase tracking-widest">Recording</span>
                     <div className="w-3 h-3 bg-red-500 rounded-full animate-ping" />
                 </div>
             )}
-            <p className="font-bold text-[#1c2b5e] mb-2">Your Response:</p>
+            <label htmlFor="voice-transcript" className="font-bold text-[#1c2b5e] mb-2 block">Your Response:</label>
             <textarea
+              id="voice-transcript"
               readOnly
               className="w-full h-44 p-5 text-[1.2rem] border border-[#cbd5e1] rounded-lg bg-white resize-none outline-none shadow-inner"
               placeholder="Your voice response will appear here..."
               value={isVerifyingAnswer || isListening ? currentAnswer : (answers[currentIdx] || "")}
+              aria-label="Transcribed voice response"
             />
           </div>
 
           <div className="flex items-center justify-between mb-8">
-            <p className={`font-bold uppercase text-sm tracking-widest transition-colors duration-300
-                ${isListening ? 'text-blue-600 animate-pulse' : (isVerifyingAnswer ? 'text-orange-500' : 'text-[#64748b]')}
-            `}>
+            <p
+                className={`font-bold uppercase text-sm tracking-widest transition-colors duration-300
+                    ${isListening ? 'text-blue-600 animate-pulse' : (isVerifyingAnswer ? 'text-orange-500' : 'text-[#64748b]')}
+                `}
+                aria-live="assertive"
+                role="status"
+            >
                 {isListening ? "Status: LISTENING..." : (isVerifyingAnswer ? "Status: PLEASE CONFIRM" : status)}
             </p>
             {error && <p className="text-red-500 text-[0.7rem] font-bold uppercase tracking-tight">Mic Error: {error}</p>}

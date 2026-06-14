@@ -80,7 +80,12 @@ const WaitingRoom = ({ name, isAuthorized, onCountdownEnd }) => {
              <h2 className="text-red-600 text-2xl font-black uppercase tracking-tight mb-2">You got authorized!</h2>
              <p className="text-slate-500 font-bold uppercase text-[0.7rem] tracking-[0.2em] mb-8">Exam starts in</p>
 
-             <div className="text-[120px] font-black text-red-600 leading-none mb-8 animate-bounce">
+             <div
+                className="text-[120px] font-black text-red-600 leading-none mb-8 animate-bounce"
+                role="timer"
+                aria-live="assertive"
+                aria-label={`Starts in ${count > 0 ? count : 'Go'}`}
+             >
                 {count > 0 ? count : "GO"}
              </div>
 
