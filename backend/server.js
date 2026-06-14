@@ -1,10 +1,11 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-require('dotenv').config();
+
 
 const { Question, Student, Response, Config } = require('./models/Schemas');
 
