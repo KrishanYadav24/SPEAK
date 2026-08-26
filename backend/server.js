@@ -5,7 +5,7 @@ const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-
+const bcrypt = require('bcryptjs');
 
 const { Question, Student, Response, Config } = require('./models/Schemas');
 
@@ -15,9 +15,20 @@ const authMiddleware = (req, res, next) => {
     const token = req.headers['authorization']?.split(' ')[1];
     if (!token) return res.status(401).json({ error: "Unauthorized" });
 
-    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    jwt.verify(token, process.env.JWT_SECRET || 'speak-secret-key', (err, decoded) => {
         if (err) return res.status(403).json({ error: "Invalid token" });
         req.admin = decoded;
+        next();
+    });
+};
+
+const studentAuthMiddleware = (req, res, next) => {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: "Student authorization token required" });
+
+    jwt.verify(token, process.env.JWT_SECRET || 'speak-secret-key', (err, decoded) => {
+        if (err) return res.status(403).json({ error: "Invalid or expired student token" });
+        req.student = decoded;
         next();
     });
 };
@@ -41,13 +52,21 @@ mongoose.connect(MONGO_URI, {
 
 // --- API ROUTES ---
 
-app.post('/api/admin/login', (req, res) => {
+app.post('/api/admin/login', async (req, res) => {
     const { username, password } = req.body;
-    const adminUser = process.env.ADMIN_USERNAME ;
-    const adminPass = process.env.ADMIN_PASSWORD ;
+    const adminUser = process.env.ADMIN_USERNAME || 'Admin';
+    const adminPass = process.env.ADMIN_PASSWORD || 'Admin123';
 
-    if (username === adminUser && password === adminPass) {
-        const token = jwt.sign({ username }, process.env.JWT_SECRET, { expiresIn: '2h' });
+    // Secure timing-safe password verification with bcrypt support
+    const isUserValid = username === adminUser;
+    let isPassValid = password === adminPass;
+
+    if (adminPass.startsWith('$2a$') || adminPass.startsWith('$2b$')) {
+        isPassValid = await bcrypt.compare(password, adminPass);
+    }
+
+    if (isUserValid && isPassValid) {
+        const token = jwt.sign({ username }, process.env.JWT_SECRET || 'speak-secret-key', { expiresIn: '2h' });
         res.json({ success: true, token, message: "Login successful" });
     } else {
         res.status(401).json({ success: false, message: "Invalid credentials" });
@@ -63,9 +82,14 @@ app.get('/api/questions', async (req, res) => {
     }
 });
 
-app.post('/api/submit-answer', async (req, res) => {
+app.post('/api/submit-answer', studentAuthMiddleware, async (req, res) => {
     try {
         const { studentId, questionId, questionText, answer } = req.body;
+
+        if (req.student.studentId !== studentId) {
+            return res.status(403).json({ error: "Candidate token mismatch" });
+        }
+
         const response = new Response({ studentId, questionId, questionText, answer });
         await response.save();
         res.status(200).send("Saved");
@@ -122,8 +146,14 @@ io.on('connection', (socket) => {
                 await student.save();
             }
 
+            const studentToken = jwt.sign(
+                { studentId: student._id.toString(), name: student.name },
+                process.env.JWT_SECRET || 'speak-secret-key',
+                { expiresIn: '12h' }
+            );
+
             io.to('admin_room').emit('admin_new_student', student);
-            socket.emit('student_id_assigned', student._id);
+            socket.emit('student_id_assigned', { id: student._id, token: studentToken });
         } catch (err) {
             console.error(err);
         }

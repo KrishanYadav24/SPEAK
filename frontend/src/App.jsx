@@ -24,8 +24,13 @@ function App() {
       setIsAuthorized(true);
     });
 
-    socket.on('student_id_assigned', (id) => {
-      setUser(prev => ({ ...prev, id }));
+    socket.on('student_id_assigned', (data) => {
+      if (typeof data === 'object' && data.id) {
+        setUser(prev => ({ ...prev, id: data.id, token: data.token }));
+        if (data.token) localStorage.setItem('studentToken', data.token);
+      } else {
+        setUser(prev => ({ ...prev, id: data }));
+      }
     });
 
     return () => {

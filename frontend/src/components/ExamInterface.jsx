@@ -110,23 +110,61 @@ const ExamInterface = ({ user, config, onFinish }) => {
     prevIsListening.current = isListening;
   }, [isListening, isVerifyingAnswer, processRecordedAnswer]);
 
+  const getAuthHeader = useCallback(() => {
+    const token = user?.token || localStorage.getItem('studentToken');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }, [user]);
+
+  const syncPendingResponses = useCallback(async () => {
+    const pending = JSON.parse(localStorage.getItem('pending_responses') || '[]');
+    if (!pending.length) return;
+
+    const remaining = [];
+    for (const item of pending) {
+      try {
+        await axios.post(`${API_URL}/api/submit-answer`, item, { headers: getAuthHeader() });
+      } catch (err) {
+        console.error("Failed to sync pending response:", err);
+        remaining.push(item);
+      }
+    }
+    localStorage.setItem('pending_responses', JSON.stringify(remaining));
+  }, [getAuthHeader]);
+
+  useEffect(() => {
+    syncPendingResponses();
+    window.addEventListener('online', syncPendingResponses);
+    return () => window.removeEventListener('online', syncPendingResponses);
+  }, [syncPendingResponses]);
+
   const handleSave = async () => {
     const q = questions[currentIdx];
     const matched = fuzzyMatch(currentAnswer, q.options);
+    const payload = {
+      studentId: user?.id,
+      questionId: q._id,
+      questionText: q.question,
+      answer: matched
+    };
+
     try {
       setStatus("Saving...");
-      await axios.post(`${API_URL}/api/submit-answer`, {
-        studentId: user.id,
-        questionId: q._id,
-        questionText: q.question,
-        answer: matched
+      await axios.post(`${API_URL}/api/submit-answer`, payload, {
+        headers: getAuthHeader()
       });
       setAnswers(prev => ({ ...prev, [currentIdx]: matched }));
       setStatus("Status: Saved");
       moveToNext();
     } catch (err) {
-      console.error(err);
-      setStatus("Status: Error saving");
+      console.error("Online submission failed, queuing response locally:", err);
+      // Offline fallback: queue response locally
+      const pending = JSON.parse(localStorage.getItem('pending_responses') || '[]');
+      pending.push(payload);
+      localStorage.setItem('pending_responses', JSON.stringify(pending));
+
+      setAnswers(prev => ({ ...prev, [currentIdx]: matched }));
+      setStatus("Status: Saved locally (Offline)");
+      moveToNext();
     }
   };
 
