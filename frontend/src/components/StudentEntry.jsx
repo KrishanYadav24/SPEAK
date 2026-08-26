@@ -39,34 +39,41 @@ const StudentEntry = ({ onJoined, onBack }) => {
     prevIsListening.current = isListening;
   }, [isListening, isVerifyingName, handleRecordingStopped]);
 
-  const handleKeyDown = (e) => {
-    const key = e.key.toLowerCase();
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (document.activeElement.tagName === 'INPUT' || (document.activeElement.tagName === 'TEXTAREA' && !document.activeElement.readOnly)) {
+        return;
+      }
 
-    if (key === 'enter') {
-      if (isVerifyingName) {
-        speak("Name confirmed. Wait for authorization.");
-        onJoined(detectedName);
-      } else if (isListening) {
-        stopListening();
-      } else {
+      const key = e.key.toLowerCase();
+      if (key === 'enter') {
+        e.preventDefault();
+        if (isVerifyingName) {
+          speak("Name confirmed. Wait for authorization.");
+          onJoined(detectedName);
+        } else if (isListening) {
+          stopListening();
+        } else {
+          setDetectedName("");
+          setIsVerifyingName(false);
+          startListening();
+        }
+      } else if (key === 'r') {
+        e.preventDefault();
+        window.speechSynthesis.cancel();
         setDetectedName("");
         setIsVerifyingName(false);
         startListening();
       }
-    } else if (key === 'r') {
-      window.speechSynthesis.cancel();
-      setDetectedName("");
-      setIsVerifyingName(false);
-      startListening();
-    }
-  };
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isVerifyingName, isListening, detectedName, onJoined, speak, startListening, stopListening]);
 
   return (
     <div
-      ref={containerRef}
       className="min-h-screen flex items-center justify-center bg-[#f8fafc] relative overflow-hidden p-4 outline-none"
-      onKeyDown={handleKeyDown}
-      tabIndex={0}
     >
       {/* Decorative background elements */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">

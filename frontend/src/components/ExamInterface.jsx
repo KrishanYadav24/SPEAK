@@ -206,18 +206,30 @@ const ExamInterface = ({ user, config, onFinish }) => {
     }
   };
 
-  const handleKeyDown = (e) => {
-    if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+  // Attach global keydown listener to window so key shortcuts work regardless of focus
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Allow normal typing if focused inside an editable input or non-readonly textarea
+      if (document.activeElement.tagName === 'INPUT' || (document.activeElement.tagName === 'TEXTAREA' && !document.activeElement.readOnly)) {
+        return;
+      }
 
-    const key = e.key.toLowerCase();
-    if (key === 'enter') {
-      handleEnter();
-    } else if (key === 's') {
-      skipQuestion();
-    } else if (key === 'r') {
-      handleRKey();
-    }
-  };
+      const key = e.key.toLowerCase();
+      if (key === 'enter') {
+        e.preventDefault();
+        handleEnter();
+      } else if (key === 's') {
+        e.preventDefault();
+        skipQuestion();
+      } else if (key === 'r') {
+        e.preventDefault();
+        handleRKey();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleEnter, skipQuestion, handleRKey]);
 
   if (!questions.length) return <div role="status">Loading questions...</div>;
   const q = questions[currentIdx];
@@ -225,9 +237,6 @@ const ExamInterface = ({ user, config, onFinish }) => {
   return (
     <div
       className="h-screen flex flex-col bg-white overflow-hidden outline-none"
-      onKeyDown={handleKeyDown}
-      tabIndex={0}
-      autoFocus
       role="main"
       aria-label={`Exam Interface: Question ${currentIdx + 1} of ${questions.length}`}
     >
@@ -309,9 +318,28 @@ const ExamInterface = ({ user, config, onFinish }) => {
             {error && <p className="text-red-500 text-[0.7rem] font-bold uppercase tracking-tight">Mic Error: {error}</p>}
           </div>
 
-          <div className="mt-auto flex gap-4 pt-5 bg-[#f8fafc] -mx-10 px-10 border-t-2 border-[#f1f5f9]">
-            <button className="bg-[#28a745] text-white px-8 py-3 rounded-lg font-bold shadow-[0_4px_0_#1e7e34] active:translate-y-0.5 active:shadow-none transition-all uppercase text-sm tracking-wider">Save & Next</button>
-            <button onClick={onFinish} className="bg-[#1c2b5e] text-white px-8 py-3 rounded-lg font-bold ml-auto uppercase text-sm tracking-wider shadow-lg hover:bg-[#121c3d]">Submit Exam</button>
+          <div className="mt-auto flex items-center gap-3 pt-5 bg-[#f8fafc] -mx-10 px-10 border-t-2 border-[#f1f5f9]">
+            <button
+              onClick={handleEnter}
+              className="bg-[#28a745] hover:bg-[#218838] text-white px-6 py-3 rounded-lg font-bold shadow-[0_4px_0_#1e7e34] active:translate-y-0.5 active:shadow-none transition-all uppercase text-sm tracking-wider flex items-center gap-2"
+            >
+              <span>{isVerifyingAnswer ? 'Confirm & Save (ENTER)' : (isListening ? 'Stop Recording (ENTER)' : 'Start Record / Confirm (ENTER)')}</span>
+            </button>
+            <button
+              onClick={handleRKey}
+              className="bg-[#f59e0b] hover:bg-[#d97706] text-white px-5 py-3 rounded-lg font-bold shadow-[0_4px_0_#b45309] active:translate-y-0.5 active:shadow-none transition-all uppercase text-sm tracking-wider"
+            >
+              Rerecord / Repeat (R)
+            </button>
+            <button
+              onClick={skipQuestion}
+              className="bg-[#64748b] hover:bg-[#475569] text-white px-5 py-3 rounded-lg font-bold shadow-[0_4px_0_#334155] active:translate-y-0.5 active:shadow-none transition-all uppercase text-sm tracking-wider"
+            >
+              Skip (S)
+            </button>
+            <button onClick={onFinish} className="bg-[#1c2b5e] text-white px-6 py-3 rounded-lg font-bold ml-auto uppercase text-sm tracking-wider shadow-lg hover:bg-[#121c3d]">
+              Submit Exam
+            </button>
           </div>
         </main>
 
