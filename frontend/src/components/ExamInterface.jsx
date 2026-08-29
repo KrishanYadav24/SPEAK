@@ -353,7 +353,11 @@ const ExamInterface = ({ user, config, onFinish }) => {
             >
                 {isListening ? "Status: LISTENING..." : (isVerifyingAnswer ? "Status: PLEASE CONFIRM" : status)}
             </p>
-            {error && <p className="text-red-500 text-[0.7rem] font-bold uppercase tracking-tight">Mic Error: {error}</p>}
+            {error && (
+              <p className="text-amber-600 text-[0.75rem] font-bold uppercase tracking-tight bg-amber-50 px-3 py-1 rounded-md border border-amber-200">
+                {error === 'not-allowed' ? 'Mic Permission Blocked' : (error === 'not-supported' ? 'Speech Recognition Unsupported' : `Mic Notice: ${error}`)}
+              </p>
+            )}
           </div>
 
           <div className="mt-auto flex items-center gap-3 pt-5 bg-[#f8fafc] -mx-10 px-10 border-t-2 border-[#f1f5f9]">

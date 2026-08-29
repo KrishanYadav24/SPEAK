@@ -129,11 +129,23 @@ const StudentEntry = ({ onJoined, onBack }) => {
         </div>
 
         {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-500">
-                <Mic className="w-5 h-5 flex-shrink-0" />
-                <p className="text-xs font-black uppercase tracking-tight leading-tight">
-                    Microphone Error: {error === 'not-allowed' ? "Permission Denied" : error}
-                </p>
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col gap-2 text-amber-900">
+                <div className="flex items-center gap-3">
+                    <Mic className="w-5 h-5 flex-shrink-0 text-amber-600" />
+                    <p className="text-xs font-black uppercase tracking-tight leading-tight">
+                        {error === 'not-allowed' ? "Microphone Access Blocked" : (error === 'not-supported' ? "Speech Recognition Unsupported" : `Microphone Notice: ${error}`)}
+                    </p>
+                </div>
+                {error === 'not-allowed' && (
+                    <p className="text-[0.75rem] text-amber-700 leading-normal pl-8">
+                        Click the lock/settings icon near the browser URL bar and set <strong>Microphone</strong> to <strong>Allow</strong>, then refresh the page. You can also type your name manually above.
+                    </p>
+                )}
+                {error === 'not-supported' && (
+                    <p className="text-[0.75rem] text-amber-700 leading-normal pl-8">
+                        Your browser doesn't natively support SpeechRecognition. Please open this portal in Google Chrome or Microsoft Edge, or type your response directly into the candidate input.
+                    </p>
+                )}
             </div>
         )}
 

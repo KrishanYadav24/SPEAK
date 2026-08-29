@@ -6,11 +6,27 @@ const useVoiceCommand = (onResultCallback) => {
   const [error, setError] = useState(null);
   const recognitionRef = useRef(null);
 
+  const isSupported = typeof window !== 'undefined' && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  const unlockAudio = useCallback(() => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.resume();
+    }
+  }, []);
+
   const speak = useCallback((text, callback) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      callback?.();
+      return;
+    }
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-IN';
     utterance.onend = () => callback?.();
+    utterance.onerror = (e) => {
+      console.warn("Speech synthesis notice:", e);
+      callback?.();
+    };
     window.speechSynthesis.speak(utterance);
   }, []);
 
@@ -52,9 +68,14 @@ const useVoiceCommand = (onResultCallback) => {
 
   const startListening = useCallback(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return alert("Speech Recognition not supported in this browser. Please use Chrome.");
+    if (!SpeechRecognition) {
+      setError("not-supported");
+      return;
+    }
 
     if (isListening) return;
+
+    unlockAudio();
 
     const recognition = new SpeechRecognition();
     recognitionRef.current = recognition;
@@ -92,9 +113,9 @@ const useVoiceCommand = (onResultCallback) => {
         console.error("Start error:", e);
         setIsListening(false);
     }
-  }, [isListening, onResultCallback]);
+  }, [isListening, onResultCallback, unlockAudio]);
 
-  return { isListening, transcript, startListening, stopListening, speak, fuzzyMatch, error };
+  return { isListening, transcript, startListening, stopListening, speak, fuzzyMatch, error, isSupported, unlockAudio };
 };
 
 export default useVoiceCommand;

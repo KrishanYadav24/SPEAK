@@ -10,7 +10,12 @@ import WaitingRoom from './components/WaitingRoom';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-const socket = io(API_URL);
+const socket = io(API_URL, {
+  transports: ['polling', 'websocket'],
+  reconnectionAttempts: 10,
+  reconnectionDelay: 2000,
+  timeout: 20000
+});
 
 function App() {
   const [screen, setScreen] = useState('portal');
