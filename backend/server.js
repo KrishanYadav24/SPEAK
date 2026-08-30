@@ -168,7 +168,7 @@ app.post('/api/submit-answer', submitLimiter, studentAuthMiddleware, async (req,
 
 app.get('/api/admin/responses', authMiddleware, async (req, res) => {
     try {
-        const responses = await Response.find().populate('studentId');
+        const responses = await Response.find().populate('studentId').populate('questionId');
         res.json(responses);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -188,6 +188,63 @@ app.get('/api/config/:key', async (req, res) => {
     try {
         const config = await Config.findOne({ key: req.params.key });
         res.json(config ? config.value : null);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/admin/config', authMiddleware, async (req, res) => {
+    try {
+        const { key, value } = req.body;
+        if (!key) return res.status(400).json({ error: "Config key is required" });
+
+        const config = await Config.findOneAndUpdate(
+            { key },
+            { value },
+            { upsert: true, new: true }
+        );
+        res.json({ success: true, message: "Configuration saved", config });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/admin/questions/upload', authMiddleware, async (req, res) => {
+    try {
+        const questionsData = req.body;
+        if (!Array.isArray(questionsData) || questionsData.length === 0) {
+            return res.status(400).json({ error: "Invalid payload: Expecting a non-empty array of questions." });
+        }
+
+        // Clean existing questions and bulk insert new question set
+        await Question.deleteMany({});
+        const insertedQuestions = await Question.insertMany(questionsData);
+
+        res.json({
+            success: true,
+            message: `Successfully uploaded ${insertedQuestions.length} questions to the database.`,
+            count: insertedQuestions.length
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/admin/responses/student/:studentId', authMiddleware, async (req, res) => {
+    try {
+        const { studentId } = req.params;
+
+        // Delete candidate responses
+        const deletedResponses = await Response.deleteMany({ studentId });
+
+        // Update candidate status to waiting or delete candidate record
+        await Student.findByIdAndUpdate(studentId, { status: 'waiting' });
+
+        res.json({
+            success: true,
+            message: "Student responses deleted and status reset",
+            deletedCount: deletedResponses.deletedCount
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
