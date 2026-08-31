@@ -284,10 +284,22 @@ const ExamInterface = ({ user, config, onFinish }) => {
           <p className="text-[0.9rem] text-[#28a745] font-bold uppercase tracking-[1.5px] mt-1">Excellence in Assessment</p>
         </div>
 
-        <div className="flex items-center gap-4 bg-[#f8fafc] border border-[#e2e8f0] p-3 px-5 rounded-lg">
-          <div className="text-right text-[0.85rem] font-semibold">
-            <p>Candidate: <span className="text-[#dc3545] font-extrabold">{user?.name}</span></p>
-            <p>Remaining: <span className="text-[#dc3545] font-extrabold">Time Left: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</span></p>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setIsManualMode(prev => !prev)}
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider border transition-all shadow-sm ${
+              isManualMode
+                ? 'bg-amber-500 text-white border-amber-600'
+                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+            }`}
+          >
+            {isManualMode ? '⌨️ Manual Input Mode (ON)' : '🎙️ Voice Mode Active'}
+          </button>
+          <div className="flex items-center gap-4 bg-[#f8fafc] border border-[#e2e8f0] p-3 px-5 rounded-lg">
+            <div className="text-right text-[0.85rem] font-semibold">
+              <p>Candidate: <span className="text-[#dc3545] font-extrabold">{user?.name}</span></p>
+              <p>Remaining: <span className="text-[#dc3545] font-extrabold">Time Left: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</span></p>
+            </div>
           </div>
         </div>
       </header>
@@ -295,6 +307,13 @@ const ExamInterface = ({ user, config, onFinish }) => {
       <div className="flex flex-1 overflow-hidden">
         {/* QUESTION AREA */}
         <main className="flex-1 p-10 overflow-y-auto flex flex-col relative" role="region" aria-labelledby="question-heading">
+          {isManualMode && (
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between text-amber-800 text-xs font-bold uppercase tracking-wider">
+              <span>⌨️ Manual Input Mode Enabled: You can type your answer directly or click an option below.</span>
+              <button onClick={() => setIsManualMode(false)} className="text-amber-900 underline font-black">Switch to Voice</button>
+            </div>
+          )}
+
           <div className="border-b-2 border-[#f1f5f9] pb-5 mb-8">
             <h3 id="question-heading" className="text-[1.1rem] text-[#1c2b5e] font-bold mb-2 uppercase">
               Question {currentIdx + 1} of {questions.length}:
@@ -311,10 +330,14 @@ const ExamInterface = ({ user, config, onFinish }) => {
                 <div key={key}
                   role="radio"
                   aria-checked={isSelected}
-                  className={`p-4 border-2 rounded-xl text-[1.1rem] font-medium transition-all duration-300
+                  onClick={() => {
+                    setCurrentAnswer(key);
+                    setIsVerifyingAnswer(true);
+                  }}
+                  className={`p-4 border-2 rounded-xl text-[1.1rem] font-medium transition-all duration-300 cursor-pointer
                     ${isSelected
-                      ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm'
-                      : 'bg-[#f8fafc] border-[#e2e8f0] text-slate-600 hover:border-slate-300'}`}>
+                      ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm ring-2 ring-blue-400/20'
+                      : 'bg-[#f8fafc] border-[#e2e8f0] text-slate-600 hover:border-blue-300 hover:bg-white'}`}>
                   <span className="font-bold mr-3">{key}.</span> {val}
                 </div>
               );
@@ -332,12 +355,27 @@ const ExamInterface = ({ user, config, onFinish }) => {
                     <div className="w-3 h-3 bg-red-500 rounded-full animate-ping" />
                 </div>
             )}
-            <label htmlFor="voice-transcript" className="font-bold text-[#1c2b5e] mb-2 block">Your Response:</label>
+            <div className="flex items-center justify-between mb-2">
+              <label htmlFor="voice-transcript" className="font-bold text-[#1c2b5e] block">Your Response:</label>
+              {!isManualMode && (
+                <button onClick={() => setIsManualMode(true)} className="text-[0.7rem] font-bold text-blue-600 hover:underline uppercase">
+                  Type manually instead
+                </button>
+              )}
+            </div>
             <textarea
               id="voice-transcript"
-              readOnly
-              className="w-full h-44 p-5 text-[1.2rem] border border-[#cbd5e1] rounded-lg bg-white resize-none outline-none shadow-inner"
-              placeholder="Your voice response will appear here..."
+              readOnly={!isManualMode}
+              onChange={(e) => {
+                if (isManualMode) {
+                  setCurrentAnswer(e.target.value);
+                  setIsVerifyingAnswer(true);
+                }
+              }}
+              className={`w-full h-44 p-5 text-[1.2rem] border rounded-lg resize-none outline-none shadow-inner transition-colors ${
+                isManualMode ? 'bg-white border-amber-400 focus:border-amber-500' : 'bg-white border-[#cbd5e1]'
+              }`}
+              placeholder={isManualMode ? "Type your response here..." : "Your voice response will appear here..."}
               value={isVerifyingAnswer || isListening ? currentAnswer : (answers[currentIdx] || "")}
               aria-label="Transcribed voice response"
             />
@@ -354,9 +392,19 @@ const ExamInterface = ({ user, config, onFinish }) => {
                 {isListening ? "Status: LISTENING..." : (isVerifyingAnswer ? "Status: PLEASE CONFIRM" : status)}
             </p>
             {error && (
-              <p className="text-amber-600 text-[0.75rem] font-bold uppercase tracking-tight bg-amber-50 px-3 py-1 rounded-md border border-amber-200">
-                {error === 'not-allowed' ? 'Mic Permission Blocked' : (error === 'not-supported' ? 'Speech Recognition Unsupported' : `Mic Notice: ${error}`)}
-              </p>
+              <div className="flex items-center gap-3">
+                <p className="text-amber-600 text-[0.75rem] font-bold uppercase tracking-tight bg-amber-50 px-3 py-1 rounded-md border border-amber-200">
+                  {error === 'not-allowed' ? 'Mic Permission Blocked' : (error === 'not-supported' ? 'Speech Recognition Unsupported' : `Mic Notice: ${error}`)}
+                </p>
+                {!isManualMode && (
+                  <button
+                    onClick={() => setIsManualMode(true)}
+                    className="text-xs font-black text-white bg-amber-600 px-3 py-1 rounded-md uppercase tracking-wider"
+                  >
+                    Switch to Manual Mode
+                  </button>
+                )}
+              </div>
             )}
           </div>
 

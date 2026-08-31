@@ -22,11 +22,31 @@ const useVoiceCommand = (onResultCallback) => {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-IN';
-    utterance.onend = () => callback?.();
-    utterance.onerror = (e) => {
-      console.warn("Speech synthesis notice:", e);
+
+    // Watchdog timer to prevent Chrome TTS freezes
+    let watchdogInterval = setInterval(() => {
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.resume();
+      } else {
+        clearInterval(watchdogInterval);
+      }
+    }, 3000);
+
+    const cleanup = () => {
+      if (watchdogInterval) clearInterval(watchdogInterval);
+    };
+
+    utterance.onend = () => {
+      cleanup();
       callback?.();
     };
+
+    utterance.onerror = (e) => {
+      console.warn("Speech synthesis notice:", e);
+      cleanup();
+      callback?.();
+    };
+
     window.speechSynthesis.speak(utterance);
   }, []);
 

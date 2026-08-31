@@ -158,6 +158,19 @@ app.post('/api/submit-answer', submitLimiter, studentAuthMiddleware, async (req,
             return res.status(403).json({ error: "Candidate token mismatch" });
         }
 
+        // Server-side exam duration enforcement
+        const student = await Student.findById(studentId);
+        if (student && student.createdAt) {
+            const config = await Config.findOne({ key: 'exam_duration' });
+            const durationMins = config ? Number(config.value) : 60;
+            const elapsedMins = (Date.now() - new Date(student.createdAt).getTime()) / (1000 * 60);
+
+            // Allow 2-minute grace period for network latency
+            if (elapsedMins > durationMins + 2) {
+                return res.status(403).json({ error: "Exam time limit exceeded. Submissions closed." });
+            }
+        }
+
         const response = new Response({ studentId, questionId, questionText, answer });
         await response.save();
         res.status(200).send("Saved");
