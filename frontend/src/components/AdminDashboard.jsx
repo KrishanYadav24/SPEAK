@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import jsPDF from 'jspdf';
 import {
   RefreshCcw,
   Download,
@@ -10,7 +11,12 @@ import {
   LayoutDashboard,
   LogOut,
   FileJson,
-  Users
+  Users,
+  Award,
+  BarChart3,
+  CheckCircle2,
+  XCircle,
+  FileText
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -148,6 +154,116 @@ const AdminDashboard = ({ socket }) => {
     }
   };
 
+  const generatePDFReport = (studentName, studentResponses) => {
+    try {
+      const doc = new jsPDF();
+
+      // Header Banner
+      doc.setFillColor(28, 43, 94); // #1c2b5e
+      doc.rect(0, 0, 210, 38, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.text('SPEAK AI EXAM SYSTEM', 14, 18);
+
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.text('OFFICIAL CANDIDATE ASSESSMENT REPORT', 14, 26);
+      doc.setFontSize(8);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 32);
+
+      // Candidate Summary Card Box
+      doc.setFillColor(248, 250, 252);
+      doc.rect(14, 45, 182, 38, 'F');
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(14, 45, 182, 38, 'S');
+
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Candidate Name: ${studentName}`, 20, 56);
+
+      // Compute scores
+      let correctCount = 0;
+      let gradedCount = 0;
+      studentResponses.forEach(res => {
+        if (res.questionId?.correctAnswer) {
+          gradedCount++;
+          const candAns = (res.answer || '').trim().toLowerCase();
+          const corrAns = (res.questionId.correctAnswer || '').trim().toLowerCase();
+          if (candAns === corrAns) correctCount++;
+        }
+      });
+
+      const accuracyPct = gradedCount > 0 ? Math.round((correctCount / gradedCount) * 100) : 0;
+      const statusGrade = accuracyPct >= 70 ? 'PASS (High Distinction)' : (accuracyPct >= 40 ? 'PASS' : 'NEEDS IMPROVEMENT');
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Total Submitted Responses: ${studentResponses.length}`, 20, 64);
+      doc.text(`Graded Score: ${correctCount} / ${gradedCount} (${accuracyPct}%)`, 20, 71);
+
+      doc.setFont('helvetica', 'bold');
+      if (accuracyPct >= 70) doc.setTextColor(22, 163, 74);
+      else if (accuracyPct >= 40) doc.setTextColor(217, 119, 6);
+      else doc.setTextColor(220, 38, 38);
+
+      doc.text(`Result Status: ${statusGrade}`, 120, 71);
+
+      // Table of Questions
+      let y = 96;
+      doc.setTextColor(28, 43, 94);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Itemized Response Log', 14,90);
+
+      studentResponses.forEach((res, index) => {
+        if (y > 265) {
+          doc.addPage();
+          y = 20;
+        }
+
+        const qText = res.questionText || res.questionId?.question || `Question ${index + 1}`;
+        const candAns = res.answer || 'No Answer';
+        const corrAns = res.questionId?.correctAnswer || 'N/A';
+        const isCorrect = res.questionId?.correctAnswer
+          ? candAns.trim().toLowerCase() === corrAns.trim().toLowerCase()
+          : null;
+
+        doc.setFillColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(30, 41, 59);
+        doc.text(`Q${index + 1}: ${qText.substring(0, 75)}${qText.length > 75 ? '...' : ''}`, 14, y);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        doc.text(`Candidate Output: "${candAns.substring(0, 60)}"`, 20, y + 6);
+
+        if (corrAns !== 'N/A') {
+          doc.text(`Target Answer: "${corrAns}"`, 20, y + 11);
+          if (isCorrect === true) {
+            doc.setTextColor(22, 163, 74);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Result: CORRECT [✓]', 130, y + 11);
+          } else {
+            doc.setTextColor(220, 38, 38);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Result: INCORRECT [✗]', 130, y + 11);
+          }
+        }
+
+        y += 18;
+      });
+
+      doc.save(`SPEAK_Assessment_${studentName.replace(/\s+/g, '_')}.pdf`);
+    } catch (err) {
+      alert("Failed to generate PDF report: " + err.message);
+    }
+  };
+
   const downloadAllJSON = () => {
     // Group responses by student for a cleaner JSON structure
     const groupedData = responses.reduce((acc, curr) => {
@@ -171,6 +287,47 @@ const AdminDashboard = ({ socket }) => {
     a.download = `all_student_responses_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
   };
+
+  // Group responses and compute system KPI stats
+  const groupedStudentEntries = Object.entries(responses.reduce((acc, curr) => {
+    const studentId = curr.studentId?._id || 'unknown';
+    if (!acc[studentId]) acc[studentId] = { name: curr.studentId?.name || 'Unknown', responses: [] };
+    acc[studentId].responses.push(curr);
+    return acc;
+  }, {}));
+
+  const totalCandidatesEvaluated = groupedStudentEntries.length;
+  let totalGradedCount = 0;
+  let totalCorrectCount = 0;
+  let passCandidateCount = 0;
+  let topStudentName = 'N/A';
+  let topStudentScorePct = -1;
+
+  groupedStudentEntries.forEach(([studentId, data]) => {
+    let sCorrect = 0;
+    let sGraded = 0;
+    data.responses.forEach(r => {
+      if (r.questionId?.correctAnswer) {
+        sGraded++;
+        if (r.answer?.trim().toLowerCase() === r.questionId.correctAnswer?.trim().toLowerCase()) {
+          sCorrect++;
+        }
+      }
+    });
+    totalGradedCount += sGraded;
+    totalCorrectCount += sCorrect;
+
+    const candPct = sGraded > 0 ? (sCorrect / sGraded) * 100 : 0;
+    if (candPct >= 70) passCandidateCount++;
+
+    if (candPct > topStudentScorePct && sGraded > 0) {
+      topStudentScorePct = candPct;
+      topStudentName = data.name;
+    }
+  });
+
+  const overallAccuracyPct = totalGradedCount > 0 ? Math.round((totalCorrectCount / totalGradedCount) * 100) : 0;
+  const overallPassRatePct = totalCandidatesEvaluated > 0 ? Math.round((passCandidateCount / totalCandidatesEvaluated) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col w-full overflow-x-hidden">
@@ -199,6 +356,48 @@ const AdminDashboard = ({ socket }) => {
 
       <main className="p-10 flex-1">
         <div className="max-w-[1500px] mx-auto space-y-10">
+          {/* ANALYTICS KPI DASHBOARD SECTION */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-white p-6 rounded-[24px] border border-[#e2e8f0] shadow-sm flex items-center gap-5">
+              <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
+                <Users className="w-7 h-7" />
+              </div>
+              <div>
+                <p className="text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Candidates Tested</p>
+                <h4 className="text-2xl font-black text-[#1e293b] mt-0.5">{totalCandidatesEvaluated}</h4>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-[24px] border border-[#e2e8f0] shadow-sm flex items-center gap-5">
+              <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center">
+                <CheckCircle2 className="w-7 h-7" />
+              </div>
+              <div>
+                <p className="text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Exam Pass Rate</p>
+                <h4 className="text-2xl font-black text-[#1e293b] mt-0.5">{overallPassRatePct}%</h4>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-[24px] border border-[#e2e8f0] shadow-sm flex items-center gap-5">
+              <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center">
+                <BarChart3 className="w-7 h-7" />
+              </div>
+              <div>
+                <p className="text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Average Accuracy</p>
+                <h4 className="text-2xl font-black text-[#1e293b] mt-0.5">{overallAccuracyPct}%</h4>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-[24px] border border-[#e2e8f0] shadow-sm flex items-center gap-5">
+              <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
+                <Award className="w-7 h-7" />
+              </div>
+              <div>
+                <p className="text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Top Candidate</p>
+                <h4 className="text-lg font-black text-[#1e293b] mt-0.5 truncate max-w-[150px]">{topStudentName}</h4>
+              </div>
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {/* Authorize Card */}
               <div className="bg-white rounded-[24px] border border-[#e2e8f0] shadow-sm flex flex-col overflow-hidden">
@@ -365,6 +564,13 @@ const AdminDashboard = ({ socket }) => {
 
                           <div className="flex items-center gap-3">
                             <button
+                              onClick={() => generatePDFReport(data.name, data.responses)}
+                              className="flex items-center gap-2 px-5 py-3 bg-[#1c2b5e] text-white rounded-xl text-[0.7rem] font-black uppercase hover:bg-blue-900 transition-all shadow-sm active:scale-95"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              Export PDF Report
+                            </button>
+                            <button
                               onClick={() => {
                                 const studentData = JSON.stringify(data.responses, null, 2);
                                 const blob = new Blob([studentData], { type: 'application/json' });
@@ -374,7 +580,7 @@ const AdminDashboard = ({ socket }) => {
                                 a.download = `responses_${data.name}.json`;
                                 a.click();
                               }}
-                              className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 rounded-xl text-[0.7rem] font-black uppercase text-slate-600 hover:border-blue-500 hover:text-blue-600 transition-all shadow-sm"
+                              className="flex items-center gap-2 px-5 py-3 bg-white border border-slate-200 rounded-xl text-[0.7rem] font-black uppercase text-slate-600 hover:border-blue-500 hover:text-blue-600 transition-all shadow-sm"
                             >
                               <Download className="w-3.5 h-3.5" />
                               Download JSON
