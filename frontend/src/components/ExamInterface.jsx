@@ -16,6 +16,25 @@ const ExamInterface = ({ user, config, onFinish }) => {
   const [skippedIndices, setSkippedIndices] = useState([]);
   const [isReviewingSkipped, setIsReviewingSkipped] = useState(false);
   const [currentSkippedPtr, setCurrentSkippedPtr] = useState(0);
+  const [isManualMode, setIsManualMode] = useState(false);
+  const [visitedIndices, setVisitedIndices] = useState([0]);
+  const [markedForReview, setMarkedForReview] = useState([]);
+
+  const jumpToQuestion = (targetIdx) => {
+    if (targetIdx < 0 || targetIdx >= questions.length) return;
+    window.speechSynthesis?.cancel();
+    setIsVerifyingAnswer(false);
+    setCurrentAnswer("");
+    setCurrentIdx(targetIdx);
+    setVisitedIndices(prev => prev.includes(targetIdx) ? prev : [...prev, targetIdx]);
+    readQuestion(questions[targetIdx], targetIdx);
+  };
+
+  const toggleMarkForReview = (targetIdx = currentIdx) => {
+    setMarkedForReview(prev =>
+      prev.includes(targetIdx) ? prev.filter(i => i !== targetIdx) : [...prev, targetIdx]
+    );
+  };
 
   const onVoiceResult = useCallback((result) => {
     setCurrentAnswer(result);
@@ -416,10 +435,20 @@ const ExamInterface = ({ user, config, onFinish }) => {
               <span>{isVerifyingAnswer ? 'Confirm & Save (ENTER)' : (isListening ? 'Stop Recording (ENTER)' : 'Start Record / Confirm (ENTER)')}</span>
             </button>
             <button
+              onClick={() => toggleMarkForReview(currentIdx)}
+              className={`px-5 py-3 rounded-lg font-bold transition-all uppercase text-sm tracking-wider border-2 shadow-sm ${
+                markedForReview.includes(currentIdx)
+                  ? 'bg-purple-600 text-white border-purple-700 shadow-[0_4px_0_#581c87]'
+                  : 'bg-purple-50 text-purple-700 border-purple-300 hover:bg-purple-100 shadow-[0_4px_0_#d8b4fe]'
+              }`}
+            >
+              {markedForReview.includes(currentIdx) ? '✓ Marked for Review' : 'Mark for Review'}
+            </button>
+            <button
               onClick={handleRKey}
               className="bg-[#f59e0b] hover:bg-[#d97706] text-white px-5 py-3 rounded-lg font-bold shadow-[0_4px_0_#b45309] active:translate-y-0.5 active:shadow-none transition-all uppercase text-sm tracking-wider"
             >
-              Rerecord / Repeat (R)
+              Rerecord (R)
             </button>
             <button
               onClick={skipQuestion}
@@ -433,39 +462,54 @@ const ExamInterface = ({ user, config, onFinish }) => {
           </div>
         </main>
 
-        {/* SIDEBAR */}
-        <aside className="w-[340px] bg-[#f8fafc] border-l-2 border-[#f1f5f9] p-8 overflow-y-auto flex flex-col shrink-0">
-          <div className="bg-white border border-[#e2e8f0] p-6 rounded-2xl mb-8 shadow-sm">
-            <div className="flex items-center gap-4 mb-4 text-[0.9rem] font-semibold text-[#475569]">
-              <span className="w-5 h-5 bg-[#28a745] rounded-md border border-[#1e7e34]" /> Answered
-            </div>
-            <div className="flex items-center gap-4 text-[0.9rem] font-semibold text-[#475569]">
-              <span className="w-5 h-5 bg-[#dc3545] rounded-md border border-[#bd2130]" /> Skipped / Pending
+        {/* JEE / NTA STYLE QUESTION PALETTE SIDEBAR */}
+        <aside className="w-[340px] bg-[#f8fafc] border-l-2 border-[#f1f5f9] p-6 overflow-y-auto flex flex-col shrink-0">
+          <div className="bg-white border border-[#e2e8f0] p-5 rounded-2xl mb-6 shadow-sm">
+            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Question Status Legend</h4>
+            <div className="grid grid-cols-2 gap-2 text-[0.8rem] font-bold text-[#475569]">
+              <div className="flex items-center gap-2">
+                <span className="w-4 h-4 bg-[#28a745] rounded-md border border-[#1e7e34] shadow-sm" /> Answered
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-4 h-4 bg-purple-600 rounded-md border border-purple-700 shadow-sm" /> Review
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-4 h-4 bg-[#f59e0b] rounded-md border border-[#d97706] shadow-sm" /> Skipped
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-4 h-4 bg-slate-200 rounded-md border border-slate-300 shadow-sm" /> Unvisited
+              </div>
             </div>
           </div>
 
-          <h4 className="text-[#1c2b5e] font-black uppercase tracking-widest text-xs mb-6 px-1 opacity-60">Question Palette:</h4>
-          <div className="grid grid-cols-4 gap-3">
+          <h4 className="text-[#1c2b5e] font-black uppercase tracking-widest text-xs mb-4 px-1 opacity-75">
+            Question Palette Matrix ({questions.length})
+          </h4>
+          <div className="grid grid-cols-4 gap-3 mb-8">
             {questions.map((_, i) => {
-              const isAnswered = !!answers[i];
+              const isAnswered = answers[i] !== undefined && answers[i] !== "";
+              const isMarked = markedForReview.includes(i);
               const isSkipped = skippedIndices.includes(i);
               const isActive = i === currentIdx;
+
+              let bgClass = "bg-white text-slate-500 border-[#cbd5e1] hover:border-slate-400"; // Default Unvisited
+              if (isMarked) {
+                bgClass = "bg-purple-600 text-white border-purple-800 shadow-sm";
+              } else if (isAnswered) {
+                bgClass = "bg-[#28a745] text-white border-[#1e7e34] shadow-sm";
+              } else if (isSkipped) {
+                bgClass = "bg-[#f59e0b] text-white border-[#d97706] shadow-sm";
+              }
 
               return (
                 <button
                   key={i}
-                  onClick={() => {
-                      if (!isReviewingSkipped || skippedIndices.includes(i)) {
-                          setCurrentIdx(i);
-                          if (isReviewingSkipped) {
-                              setCurrentSkippedPtr(skippedIndices.indexOf(i));
-                          }
-                      }
-                  }}
-                  className={`aspect-square flex items-center justify-center rounded-xl font-bold text-[1.1rem] border-2 transition-all duration-300
-                    ${isActive ? 'ring-4 ring-blue-500/20 border-blue-500 scale-105 z-10' : 'border-[#cbd5e1] hover:border-slate-400'}
-                    ${isAnswered ? 'bg-[#28a745] text-white border-[#1e7e34]' : (isSkipped ? 'bg-[#dc3545] text-white border-[#bd2130]' : 'bg-white text-slate-400')}
+                  onClick={() => jumpToQuestion(i)}
+                  className={`aspect-square flex items-center justify-center rounded-xl font-bold text-[1.1rem] border-2 transition-all duration-300 relative
+                    ${bgClass}
+                    ${isActive ? 'ring-4 ring-blue-500/30 border-blue-500 scale-105 z-10 font-extrabold shadow-md' : ''}
                   `}
+                  title={`Question ${i + 1}`}
                 >
                   {i + 1}
                 </button>
@@ -473,20 +517,20 @@ const ExamInterface = ({ user, config, onFinish }) => {
             })}
           </div>
 
-          <div className="mt-12 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
-              <p className="text-[0.7rem] font-black text-slate-400 uppercase tracking-widest text-center">Controls</p>
+          <div className="mt-auto bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+              <p className="text-[0.7rem] font-black text-slate-400 uppercase tracking-widest text-center">Shortcuts</p>
               <div className="grid gap-2">
                   <div className="flex items-center justify-between text-[0.75rem] font-bold text-slate-500 bg-slate-50 p-2 px-3 rounded-lg">
-                      <span>Start/Stop</span>
-                      <kbd className="bg-white border border-slate-300 rounded px-1 min-w-[30px] text-center shadow-sm">ENTER</kbd>
+                      <span>Record / Save</span>
+                      <kbd className="bg-white border border-slate-300 rounded px-1.5 min-w-[30px] text-center shadow-sm font-black">ENTER</kbd>
                   </div>
                   <div className="flex items-center justify-between text-[0.75rem] font-bold text-slate-500 bg-slate-50 p-2 px-3 rounded-lg">
                       <span>Rerecord</span>
-                      <kbd className="bg-white border border-slate-300 rounded px-1 min-w-[30px] text-center shadow-sm">R</kbd>
+                      <kbd className="bg-white border border-slate-300 rounded px-1.5 min-w-[30px] text-center shadow-sm font-black">R</kbd>
                   </div>
                   <div className="flex items-center justify-between text-[0.75rem] font-bold text-slate-500 bg-slate-50 p-2 px-3 rounded-lg">
                       <span>Skip</span>
-                      <kbd className="bg-white border border-slate-300 rounded px-1 min-w-[30px] text-center shadow-sm">S</kbd>
+                      <kbd className="bg-white border border-slate-300 rounded px-1.5 min-w-[30px] text-center shadow-sm font-black">S</kbd>
                   </div>
               </div>
           </div>
