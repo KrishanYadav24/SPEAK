@@ -9,7 +9,9 @@ import WaitingRoom from './components/WaitingRoom';
 
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const API_URL = isLocal ? 'http://localhost:5000' : (import.meta.env.VITE_API_URL || 'https://speak-20z0.onrender.com');
+
 const socket = io(API_URL, {
   transports: ['polling', 'websocket'],
   reconnectionAttempts: 10,
@@ -96,7 +98,7 @@ function App() {
         />
       )}
 
-      {screen === 'exam' && <ExamInterface user={user} config={examConfig} onFinish={handleFinish} />}
+      {screen === 'exam' && <ExamInterface user={user} config={examConfig} socket={socket} onFinish={handleFinish} />}
 
       {screen === 'finish' && (
         <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">

@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import useVoiceCommand from '../hooks/useVoiceCommand';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const API_URL = isLocal ? 'http://localhost:5000' : (import.meta.env.VITE_API_URL || 'https://speak-20z0.onrender.com');
 
-const ExamInterface = ({ user, config, onFinish }) => {
+const ExamInterface = ({ user, config, socket, onFinish }) => {
   const [questions, setQuestions] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState({});
@@ -288,6 +289,64 @@ const ExamInterface = ({ user, config, onFinish }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleEnter, skipQuestion, handleRKey]);
 
+  // Web Serial API Direct ESP32 Connection (No Wi-Fi needed!)
+  const [hardwareConnected, setHardwareConnected] = useState(false);
+
+  const connectHardwareUSB = async () => {
+    try {
+      if (!('serial' in navigator)) {
+        alert("Web Serial API is supported in Google Chrome, Microsoft Edge, and Opera.");
+        return;
+      }
+      const port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+      setHardwareConnected(true);
+
+      const decoder = new TextDecoderStream();
+      port.readable.pipeTo(decoder.writable);
+      const reader = decoder.readable.getReader();
+
+      let buffer = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += value;
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          const action = line.trim();
+          if (action === 'ENTER') {
+            handleEnter();
+          } else if (action === 'R') {
+            handleRKey();
+          } else if (action === 'S') {
+            skipQuestion();
+          }
+        }
+      }
+    } catch (err) {
+      console.error("WebSerial error:", err);
+    }
+  };
+
+  // Listen for physical ESP32 breadboard push button triggers via socket
+  useEffect(() => {
+    if (!socket) return;
+    const handleHardwareTrigger = (key) => {
+      if (key === 'ENTER') {
+        handleEnter();
+      } else if (key === 'R') {
+        handleRKey();
+      } else if (key === 'S') {
+        skipQuestion();
+      }
+    };
+
+    socket.on('hardware_trigger', handleHardwareTrigger);
+    return () => socket.off('hardware_trigger', handleHardwareTrigger);
+  }, [socket, handleEnter, handleRKey, skipQuestion]);
+
   if (!questions.length) return <div role="status">Loading questions...</div>;
   const q = questions[currentIdx];
 
@@ -304,6 +363,17 @@ const ExamInterface = ({ user, config, onFinish }) => {
         </div>
 
         <div className="flex items-center gap-4">
+          <button
+            onClick={connectHardwareUSB}
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border flex items-center gap-2 shadow-sm ${
+              hardwareConnected
+                ? 'bg-emerald-500 text-white border-emerald-600 shadow-emerald-500/20'
+                : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300'
+            }`}
+          >
+            <span className={`w-2.5 h-2.5 rounded-full ${hardwareConnected ? 'bg-white animate-pulse' : 'bg-slate-400'}`} />
+            {hardwareConnected ? '🔌 ESP32 Box Active' : '🔌 Connect ESP32 USB'}
+          </button>
           <button
             onClick={() => setIsManualMode(prev => !prev)}
             className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider border transition-all shadow-sm ${

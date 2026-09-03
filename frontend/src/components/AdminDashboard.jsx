@@ -19,7 +19,8 @@ import {
   FileText
 } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const API_URL = isLocal ? 'http://localhost:5000' : (import.meta.env.VITE_API_URL || 'https://speak-20z0.onrender.com');
 
 const AdminDashboard = ({ socket }) => {
   const [waitingStudents, setWaitingStudents] = useState([]);
