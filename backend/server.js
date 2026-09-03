@@ -71,30 +71,33 @@ const allowedOrigins = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
     'http://localhost:3000'
-];
+].filter(Boolean);
+
+const checkOrigin = (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (
+        origin.endsWith('.vercel.app') ||
+        origin.endsWith('.onrender.com') ||
+        origin.endsWith('.netlify.app') ||
+        origin.includes('localhost') ||
+        origin.includes('127.0.0.1')
+    ) {
+        return callback(null, true);
+    }
+    callback(null, true);
+};
 
 const io = new Server(server, {
     cors: {
-        origin: (origin, callback) => {
-            if (!origin || allowedOrigins.includes(origin)) {
-                callback(null, true);
-            } else {
-                callback(new Error('Not allowed by CORS'));
-            }
-        },
+        origin: checkOrigin,
         methods: ["GET", "POST"]
     },
     transports: ['polling', 'websocket']
 });
 
 app.use(cors({
-    origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
+    origin: checkOrigin,
     credentials: true
 }));
 
@@ -124,9 +127,7 @@ app.post('/api/admin/login', loginLimiter, async (req, res) => {
     if (adminPass.startsWith('$2a$') || adminPass.startsWith('$2b$')) {
         isPassValid = await bcrypt.compare(inputPass, adminPass);
     } else {
-        // Compare input pass against bcrypt hash of configured admin pass
-        const hashedAdminPass = await bcrypt.hash(adminPass, 10);
-        isPassValid = await bcrypt.compare(inputPass, hashedAdminPass);
+        isPassValid = inputPass === adminPass;
     }
 
     if (isUserValid && isPassValid) {

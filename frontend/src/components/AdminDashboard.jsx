@@ -85,6 +85,11 @@ const AdminDashboard = ({ socket }) => {
     setWaitingStudents(prev => prev.filter(s => s._id !== id));
   };
 
+  const rejectStudent = (id) => {
+    socket.emit('admin_reject_student', id);
+    setWaitingStudents(prev => prev.filter(s => s._id !== id));
+  };
+
   const handleSaveDuration = async () => {
     try {
       setIsSavingDuration(true);
@@ -400,56 +405,75 @@ const AdminDashboard = ({ socket }) => {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {/* Authorize Card */}
-              <div className="bg-white rounded-[24px] border border-[#e2e8f0] shadow-sm flex flex-col overflow-hidden">
-                  <div className="p-6 border-b border-[#f1f5f9] flex items-center justify-between bg-slate-50/50">
+              <div className="bg-white rounded-[28px] border border-slate-200/80 shadow-md shadow-slate-100 flex flex-col overflow-hidden hover:shadow-lg transition-all">
+                  <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
                       <div className="flex items-center gap-3 text-[#1c2b5e]">
-                        <UserCheck className="w-5 h-5" />
-                        <h3 className="text-[1.1rem] font-black uppercase tracking-tight">Authorization Queue</h3>
+                        <div className="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+                          <UserCheck className="w-5 h-5" />
+                        </div>
+                        <h3 className="text-[1.05rem] font-black uppercase tracking-tight">Authorization Queue</h3>
                       </div>
-                      <span className="bg-blue-600 text-white text-[0.7rem] font-black px-2.5 py-1 rounded-full">{waitingStudents.length}</span>
+                      <span className="bg-blue-600 text-white text-[0.75rem] font-black px-3 py-1 rounded-full shadow-sm">{waitingStudents.length}</span>
                   </div>
-                  <div className="flex-1 min-h-[350px] p-6 space-y-3">
+                  <div className="flex-1 min-h-[350px] p-6 space-y-3.5">
                       {waitingStudents.map(s => (
-                          <div key={s._id} className="bg-white p-5 rounded-2xl border border-[#e2e8f0] flex justify-between items-center shadow-sm hover:border-blue-300 transition-colors animate-in fade-in slide-in-from-left-4">
-                              <div className="flex flex-col">
-                                <span className="font-black text-[#1e293b]">{s.name}</span>
-                                <span className="text-[10px] text-slate-400 font-bold uppercase">Candidate ID: {s._id.slice(-6)}</span>
+                          <div key={s._id} className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 flex justify-between items-center shadow-sm hover:border-blue-300 transition-all animate-in fade-in slide-in-from-left-4">
+                              <div className="flex flex-col pr-2">
+                                <span className="font-black text-[#1e293b] text-sm">{s.name}</span>
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Candidate ID: {s._id.slice(-6)}</span>
                               </div>
-                              <button onClick={() => authorize(s._id)} className="bg-[#3b82f6] text-white px-5 py-2 rounded-xl text-xs font-black uppercase hover:bg-[#2563eb] transition-all shadow-md active:scale-95">Authorize</button>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  onClick={() => authorize(s._id)}
+                                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-blue-500/20 active:scale-95 flex items-center gap-1.5"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  Authorize
+                                </button>
+                                <button
+                                  onClick={() => rejectStudent(s._id)}
+                                  title="Reject / Remove candidate"
+                                  className="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white p-2.5 rounded-xl text-xs font-black transition-all shadow-sm active:scale-95"
+                                >
+                                  <XCircle className="w-4 h-4" />
+                                </button>
+                              </div>
                           </div>
                       ))}
                       {waitingStudents.length === 0 && (
                         <div className="h-full flex flex-col items-center justify-center text-slate-300 py-20">
                           <Users className="w-12 h-12 mb-4 opacity-20" />
-                          <p className="text-center font-bold text-sm uppercase tracking-widest opacity-50">No students waiting</p>
+                          <p className="text-center font-bold text-xs uppercase tracking-widest opacity-50">No candidates waiting</p>
                         </div>
                       )}
                   </div>
               </div>
 
               {/* Config Card */}
-              <div className="bg-white rounded-[24px] border border-[#e2e8f0] shadow-sm p-8 flex flex-col overflow-hidden">
-                  <div className="flex items-center gap-3 text-[#1c2b5e] mb-8 pb-4 border-b border-slate-50">
-                    <Settings className="w-5 h-5" />
-                    <h3 className="text-[1.1rem] font-black uppercase tracking-tight">Exam Control</h3>
+              <div className="bg-white rounded-[28px] border border-slate-200/80 shadow-md shadow-slate-100 p-8 flex flex-col overflow-hidden hover:shadow-lg transition-all">
+                  <div className="flex items-center gap-3 text-[#1c2b5e] mb-8 pb-4 border-b border-slate-100">
+                    <div className="w-9 h-9 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center">
+                      <Settings className="w-5 h-5" />
+                    </div>
+                    <h3 className="text-[1.05rem] font-black uppercase tracking-tight">Exam Control</h3>
                   </div>
-                  <div className="space-y-8 flex-1">
+                  <div className="space-y-8 flex-1 flex flex-col justify-between">
                       <div className="space-y-3">
                           <label className="text-[0.75rem] font-black text-[#64748b] uppercase tracking-widest block ml-1">Test Duration (Minutes)</label>
-                          <div className="relative">
+                          <div className="relative flex items-center">
                             <input
                               type="number"
                               value={duration}
                               onChange={e => setDuration(e.target.value)}
-                              className="w-full p-5 bg-slate-50 border border-[#e2e8f0] rounded-2xl font-black text-xl text-blue-600 outline-none focus:border-[#3b82f6] transition-all"
+                              className="w-full pl-6 pr-20 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-xl text-[#1c2b5e] outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
                             />
-                            <span className="absolute right-6 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">MINS</span>
+                            <span className="absolute right-6 font-black text-slate-400 text-xs tracking-wider uppercase pointer-events-none">MINS</span>
                           </div>
                       </div>
                       <button
                         onClick={handleSaveDuration}
                         disabled={isSavingDuration}
-                        className="w-full bg-[#1c2b5e] text-white p-5 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 active:scale-95 mt-auto disabled:opacity-50"
+                        className="w-full bg-[#1c2b5e] text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 active:scale-95 disabled:opacity-50"
                       >
                         {isSavingDuration ? 'Saving...' : 'Save Changes'}
                       </button>
@@ -457,19 +481,21 @@ const AdminDashboard = ({ socket }) => {
               </div>
 
               {/* Upload Card */}
-              <div className="bg-white rounded-[24px] border border-[#e2e8f0] shadow-sm p-8 flex flex-col overflow-hidden">
-                  <div className="flex items-center gap-3 text-[#1c2b5e] mb-8 pb-4 border-b border-slate-50">
-                    <Database className="w-5 h-5" />
-                    <h3 className="text-[1.1rem] font-black uppercase tracking-tight">Question Bank</h3>
+              <div className="bg-white rounded-[28px] border border-slate-200/80 shadow-md shadow-slate-100 p-8 flex flex-col overflow-hidden hover:shadow-lg transition-all">
+                  <div className="flex items-center gap-3 text-[#1c2b5e] mb-8 pb-4 border-b border-slate-100">
+                    <div className="w-9 h-9 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
+                      <Database className="w-5 h-5" />
+                    </div>
+                    <h3 className="text-[1.05rem] font-black uppercase tracking-tight">Question Bank</h3>
                   </div>
-                  <div className="space-y-8 flex-1">
+                  <div className="space-y-8 flex-1 flex flex-col justify-between">
                       <div className="space-y-3">
                           <label className="text-[0.75rem] font-black text-[#64748b] uppercase tracking-widest block ml-1 text-center mb-2">Sync Source File</label>
-                          <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer group relative">
+                          <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center bg-slate-50 hover:bg-blue-50/50 hover:border-blue-300 transition-all cursor-pointer group relative">
                             <input type="file" id="q-file" accept=".json" onChange={handleFileChange} className="hidden" />
                             <label htmlFor="q-file" className="cursor-pointer">
-                              <FileJson className="w-8 h-8 text-slate-400 mx-auto mb-3 group-hover:text-blue-500 transition-colors" />
-                              <p className="text-[0.65rem] font-black text-slate-400 uppercase tracking-tighter">
+                              <FileJson className="w-8 h-8 text-slate-400 mx-auto mb-3 group-hover:text-blue-600 group-hover:scale-110 transition-all" />
+                              <p className="text-[0.7rem] font-black text-slate-600 uppercase tracking-tight truncate max-w-[200px] mx-auto">
                                 {jsonFile ? jsonFile.name : 'Choose JSON Resource'}
                               </p>
                             </label>
@@ -478,7 +504,7 @@ const AdminDashboard = ({ socket }) => {
                       <button
                         onClick={handleUploadQuestions}
                         disabled={isUploadingQuestions}
-                        className="w-full bg-[#3b82f6] text-white p-5 rounded-2xl font-black uppercase tracking-widest hover:bg-[#2563eb] transition-all shadow-xl shadow-blue-100 active:scale-95 mt-auto disabled:opacity-50"
+                        className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 active:scale-95 disabled:opacity-50"
                       >
                         {isUploadingQuestions ? 'Uploading...' : 'Upload to Server'}
                       </button>
